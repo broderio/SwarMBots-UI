@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define ROS_HEADER_LEN  7
-#define ROS_FOOTER_LEN  1
+#define ROS_FOOTER_LEN  1 
 #define ROS_PKG_LEN     ROS_HEADER_LEN + ROS_FOOTER_LEN
 #define SYNC_FLAG       0xff
 #define VERSION_FLAG    0xfe

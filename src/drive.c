@@ -15,7 +15,7 @@ uint8_t* command_serializer(float vx, float vy, float wz){
         .vy = vy,
         .wz = wz
     };
-
+    
     // Initialize variables for packet
     size_t msg_len = sizeof(msg);
     uint8_t* msg_serialized = reinterpret_cast<uint8_t*>(malloc(msg_len));

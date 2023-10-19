@@ -5,7 +5,7 @@
  *   mbot_motor_vel_t
  *   twist3D_t
  *   mbot_imu_t
- *   slam_status_t
+ *   slam_status_t 
  *   mbot_motor_pwm_t
  *   pose3D_t
  *   timestamp_t

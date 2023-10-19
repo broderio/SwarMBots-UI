@@ -7,7 +7,7 @@
 #define COMMS_OK 1
 #define MBOT_TIMEOUT_US 1000000
 
-
+ 
 #define SYS_CLOCK       125000 //system clock in kHz
 #define PWM_FREQ        10000
 #define MAIN_LOOP_HZ            25.0 // Hz of control loop
