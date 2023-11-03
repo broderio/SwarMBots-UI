@@ -8,18 +8,17 @@
 #include "mbot_params.h"
 #include "comms.h"
 
-
 uint8_t* command_serializer(float vx, float vy, float wz){
     serial_twist2D_t msg = {
         .vx = vx,
         .vy = vy,
         .wz = wz
     };
-    
+
     // Initialize variables for packet
     size_t msg_len = sizeof(msg);
-    uint8_t* msg_serialized = reinterpret_cast<uint8_t*>(malloc(msg_len));
-    uint8_t* packet = reinterpret_cast<uint8_t*>(malloc(msg_len + ROS_PKG_LEN));
+    uint8_t* msg_serialized = (uint8_t*)(malloc(msg_len));
+    uint8_t* packet = (uint8_t*)(malloc(msg_len + ROS_PKG_LEN));
 
     // Serialize message and create packet
     twist2D_t_serialize(&msg, msg_serialized);
@@ -74,7 +73,7 @@ int main() {
     }
 
     printf("Sent %ld bytes\n", bytes_written);
-    for (int i = 0; i < sizeof(serial_twist2D_t) + ROS_PKG_LEN; i++) {
+    for (uint32_t i = 0; i < sizeof(serial_twist2D_t) + ROS_PKG_LEN; i++) {
         printf("packet[%d]: 0x%x\n", i, packet[i]);
     }
 
