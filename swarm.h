@@ -9,7 +9,7 @@ struct USB_packet {
     //some way to store most recent USB data ?
 };
 
-class Swarm_Interface{
+class Swarm{
 public:
     /*
     What do we want to pass into inializer? Require that they pass in # of robots?
@@ -19,7 +19,9 @@ public:
     int Swarm_init();
 
 private:
+    //this mutex protects the usb structure
 
+    std::mutex usb_mutex;
     int num_robots;
     int swarm_error;
     USB_packet usb;
