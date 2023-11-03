@@ -29,25 +29,25 @@ public:
     int robot_init(mbot_params_t params, uint8_t *mac_address);
 
     // Gets the odometry
-    int robot_get_odometry(serial_pose2d_t *odometry);
+    int robot_get_odometry(serial_pose2d_t &odometry);
 
     // Gets the IMU
-    int robot_get_imu(serial_mbot_imu_t *imu);
+    int robot_get_imu(serial_mbot_imu_t &imu);
 
     // Gets the encoders
-    int robot_get_encoders(serial_mbot_encoders_t *encoders);
+    int robot_get_encoders(serial_mbot_encoders_t &encoders);
 
     // Gets the velocity
-    int robot_get_vel(serial_twist2d_t *velocity);
+    int robot_get_vel(serial_twist2d_t &velocity_out);
 
     // Gets the motor velocity
-    int robot_get_motor_vel(serial_mbot_motor_vel_t *motor_vel);
+    int robot_get_motor_vel(serial_mbot_motor_vel_t &motor_vel);
 
     // Gets the motor PWM
-    int robot_get_motor_pwm(serial_mbot_motor_pwm_t *motor_pwm);
+    int robot_get_motor_pwm(serial_mbot_motor_pwm_t &motor_pwm);
 
     // Gets the drive mode
-    int robot_get_drive_mode(int *drive_mode);
+    int robot_get_drive_mode(int &drive_mode);
 
     // Resets the odometry
     int robot_reset_odometry();
@@ -71,6 +71,8 @@ public:
     void data_read_host_cb(void* args);
 
     private:
+    //  Mutexes to protect each member variable to avoid race conditions
+    //  when the user tries to read a variable as its being written.
     std::mutex odometry_mutex;
     std::mutex velocity_mutex;
     std::mutex imu_mutex;
@@ -79,7 +81,7 @@ public:
     std::mutex motor_vel_mutex;
     std::mutex motor_pwm_mutex;
     std::mutex drive_mode_mutex;
-    
+
     serial_pose2d_t odometry; // The robot's current odometry
     serial_twist2d_t velocity; // The robot's current velocity
     serial_mbot_imu_t imu; // The robot's current IMU values
@@ -90,6 +92,15 @@ public:
     int drive_mode; // The robot's current drive mode
     mbot_params_t params; // The robot's physical parameters
     uint8_t mac_address[MAC_LENGTH]; // The robot's MAC address for esp-now communication
+
+    int rob_error;
 };
+
+/*
+I feel like we need to wrap another layer over this to launch a task to intake USB packets and then route them.
+It also might contain an init funtion that the user has to call at the beginning of their main function
+to initialize the USB packet routing task. I'm also thinking what we might actually want to expose to the user
+is an array of robots 
+*/
 
 #endif
