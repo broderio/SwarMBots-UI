@@ -4,6 +4,7 @@
 #include "mbot_lcm_msgs_serial.h"
 #include "mbot_params.h"
 #include "comms.h"
+
 /*
 typedef struct robot_t {
     serial_pose2d_t odometry; // The robot's current odometry

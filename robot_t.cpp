@@ -4,9 +4,7 @@
 #include <thread>
 
 #include "robot_t.h"
-#include "mbot_lcm_msgs_serial.h"
-#include "mbot_params.h"
-#include "comms.h"
+
 
 using std::mutex;
 using std::thread;
