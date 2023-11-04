@@ -5,6 +5,8 @@
 #include "mbot_params.h"
 #include "comms.h"
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <unordered_map>
 #include <string>
 
@@ -24,18 +26,20 @@ typedef struct robot_t {
 */
 #define MAC_LENGTH 12
 
-struct USB_packet {
-    uint8_t MAC_address[MAC_LENGTH];
-    uint8_t *data;
-    uint32_t data_len;
-};
-
 using std::mutex;
 using std::unordered_map;
 using std::condition_variable;
 using std::string;
 
 #define MAC_LENGTH 12
+
+struct USB_packet {
+    uint8_t MAC_address[MAC_LENGTH];
+    mutex data_mutex;
+    uint8_t *data;
+    uint32_t data_len;
+};
+
 class Swarm{
     friend class robot_t;
     class robot_t{
@@ -82,21 +86,33 @@ class Swarm{
     uint8_t num_robots;
     int swarm_error;
     USB_packet usb;
-    unordered_map<string, robot_t> MAC_to_Robot;
-    unordered_map<string, string> Name_to_MAC;
+    string port;
+    int serial_port;
+
+    mutex map_lock;
+    unordered_map<string, robot_t*> mac_to_robot;
+    unordered_map<string, string> name_to_mac;
     //This process gets a new packet from USB, puts it in the USB
+    Swarm();
+    Swarm(string);
+    ~Swarm();
     void swarm_thread();
+    
     robot_t* name_to_rob(string& rob_name);
+
+    int serial_send(string, uint8_t*, uint32_t);
+
+    uint8_t* command_serializer(float vx, float vy, float wz);
 
     public:
     // Gets the odometry
     int robot_get_odometry(string &rob_name, serial_pose2d_t &odometry);
 
     // Gets the IMU
-    int robot_get_imu(string &rob_name, serial_mbot_imu_t &imu);
+    serial_mbot_imu_t robot_get_imu(string &rob_name, serial_mbot_imu_t &imu);
 
     // Gets the encoders
-    int robot_get_encoders(string &rob_name, serial_mbot_encoders_t &encoders);
+    serial_mbot_encoders_t robot_get_encoders(string &rob_name, serial_mbot_encoders_t &encoders);
 
     // Gets the velocity
     int robot_get_vel(string &rob_name, serial_twist2d_t &velocity_out);
@@ -129,7 +145,6 @@ class Swarm{
     int robot_set_motor_pwm(string &rob_name, float left, float right);
 
 };
-
 
 /*
 I feel like we need to wrap another layer over this to launch a task to intake USB packets and then route them.
