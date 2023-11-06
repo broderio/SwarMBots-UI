@@ -15,6 +15,20 @@
 
 using mac_address_t = uint8_t[MAC_LENGTH];
 
+template <typename T>
+class thread_safe_t
+{
+public:
+    thread_safe_t();
+    ~thread_safe_t();
+    T get();
+    void set(T data);
+
+private:
+    T data;
+    std::mutex mtx;
+};
+
 class mbot
 {
 public:
@@ -31,7 +45,7 @@ public:
     int set_motor_vel_goal(float a, float b, float c = 0.0f);
 
     serial_mbot_motor_pwm_t get_motor_pwm();
-    int set_motor_pwm(float a, float b, float c=0.0f);
+    int set_motor_pwm(float a, float b, float c = 0.0f);
 
     serial_pose2D_t get_odom();
     serial_mbot_encoders_t get_encoders();
@@ -48,28 +62,24 @@ public:
     int is_alive;
 
 private:
-    serial_twist2D_t robot_vel;
-    serial_mbot_imu_t imu;
-    serial_mbot_motor_vel_t motor_vel;
-    serial_mbot_motor_pwm_t motor_pwm;
+    thread_safe_t<serial_twist2D_t> robot_vel;
+    thread_safe_t<serial_mbot_imu_t> imu;
+    thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
+    thread_safe_t<serial_mbot_motor_pwm_t> motor_pwm;
+    thread_safe_t<serial_pose2D_t> odom;
+    thread_safe_t<serial_mbot_encoders_t> encoders;
 
     serial_twist2D_t robot_vel_goal;
     serial_mbot_motor_vel_t motor_vel_goal;
     serial_mbot_motor_pwm_t motor_pwm_goal;
 
-    // Mutexes for data
-    std::mutex robot_vel_mutex;
-    std::mutex imu_mutex;
-    std::mutex motor_vel_mutex;
-    std::mutex motor_pwm_mutex;
-
     // Mutex for USB
-    std::mutex usb_mutex;
+    std::mutex usb_mtx;
 
     // Static variables and functions for robot_thread()
     std::string mac_to_string(const mac_address_t mac_address); // converts mac_address_t to std::string
-    static std::unordered_map<std::string, mbot *> mbots; // contains pointers to all instatiated mbot objects
-    static void mbot_th(); // updates all instatiated mbot objects
-    static bool th_running; // set true on the first instatiated mbot object
+    static std::unordered_map<std::string, mbot *> mbots;       // contains pointers to all instatiated mbot objects
+    static void mbot_th();                                      // updates all instatiated mbot objects
+    static bool th_running;                                     // set true on the first instatiated mbot object
     std::thread mbot_th_handle;
 };
