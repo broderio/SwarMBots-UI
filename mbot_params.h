@@ -58,6 +58,11 @@ typedef struct mbot_params_t{
     float itrcpt_neg[3];
 } mbot_params_t;
 
-
+enum drive_mode_t{
+    MODE_MOTOR_PWM = 0,
+    MODE_MOTOR_VEL_OL,
+    MODE_MOTOR_VEL_PID,
+    MODE_MBOT_VEL
+};
 
 #endif
