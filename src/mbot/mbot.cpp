@@ -65,8 +65,11 @@ std::string mbot::port_name;
 
 std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
+std::mutex mbot::recv_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
+std::queue<uint8_t*> mbot::recv_queue;
 std::condition_variable mbot::send_cv;
+std::condition_variable mbot::recv_cv;
 
 // Default constructor for mbot class
 mbot::mbot() {
@@ -415,8 +418,12 @@ void mbot::mbot_th()
         int bytes_read = read(serial_port, buffer, sizeof(buffer));
         if (bytes_read > 0)
         {
-            buffer[bytes_read] = '\0';
-            printf("Received: %s", buffer);
+            uint8_t* data = new uint8_t[bytes_read];
+            std::memcpy(data, buffer, bytes_read);
+            recv_mutex.lock();
+            recv_queue.push(data);
+            recv_mutex.unlock();
+            recv_cv.notify_one();
         }
     }
 }
@@ -443,10 +450,6 @@ void mbot::send_th()
         else
         {
             printf("Sent %ld bytes\n", bytes_written);
-            for (uint32_t i = 0; i < sizeof(serial_twist2D_t) + ROS_PKG_LEN; i++)
-            {
-                printf("packet[%d]: 0x%x\n", i, packet.data[i]);
-            }
         }
     }
 }
@@ -460,4 +463,33 @@ void mbot::data_th()
         //       4. Validate message
         //       5. Convert message
         //       6. Update robot object
+    while (1)
+    {
+        uint8_t* msg;
+        { // scope for which we need the lock on the queue
+            std::unique_lock<std::mutex> queue_lock(recv_mutex);
+            while (recv_queue.empty())
+            {
+                recv_cv.wait(queue_lock);
+            }
+            msg = recv_queue.front();
+            recv_queue.pop();
+        }
+
+        // TODO: Read header of msg and validate
+
+
+        // TODO: Read actual message and validate
+
+
+        // TODO: Read incoming MAC address and validate
+
+
+        // TODO: Convert message to serial_*_t given the topic specified by the header
+
+
+        // TODO: Update mbot with corresponding MAC address with new data
+
+        delete[] msg;
+    }
 }

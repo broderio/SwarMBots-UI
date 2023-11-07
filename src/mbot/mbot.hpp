@@ -98,16 +98,19 @@ private:
     static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
 
     static void mbot_th();  // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
+    static void send_th(); // thread to send updates to host via serial
+    static std::mutex recv_mutex;
+    static std::mutex send_mutex;
+    static std::queue<uint8_t*> recv_queue; // queue containing packets received 
+    static std::queue<packet_t> send_queue; // queue containing packets to be sent
+    static std::condition_variable recv_cv; // condition variable to waken the send thread
+    static std::condition_variable send_cv; // condition variable to waken the send thread
+    
     static bool th_running; // set true on the first instatiated mbot object
     static std::thread mbot_th_handle;
+    static std::thread send_th_handle;
     static int serial_port;
     static std::string port_name;
-
-    static void send_th(); // thread to send updates to host via serial
-    static std::thread send_th_handle;
-    static std::mutex send_mutex;
-    static std::queue<packet_t> send_queue; // queue containing packets to be sent NOTE: pointer to packet and pointer to packet length sequentially
-    static std::condition_variable send_cv; // condition variable to waken the send thread
 
     void data_th(); // thread for each robot to parse, process, and update variables
     std::thread data_th_handle;
