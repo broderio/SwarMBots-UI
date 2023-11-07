@@ -162,14 +162,14 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_twist2D_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     twist2D_t_serialize(&robot_vel_goal, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_VEL_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_VEL_CMD, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -190,14 +190,14 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_vel_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_motor_vel_t_serialize(&motor_vel_goal, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_VEL_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_VEL_CMD, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -224,14 +224,14 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_pwm_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_motor_pwm_t_serialize(&mbot_pwm, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_PWM_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_PWM_CMD, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -263,14 +263,14 @@ void mbot::set_odom(float x, float y, float theta)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     pose2D_t_serialize(&mbot_odom, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -292,14 +292,14 @@ void mbot::reset_odom()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     pose2D_t_serialize(&mbot_odom, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -321,14 +321,14 @@ void mbot::set_encoders(int a, int b, int c = 0)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_encoders_t_serialize(&mbot_encoders, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -350,14 +350,14 @@ void mbot::reset_encoders()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_encoders_t_serialize(&mbot_encoders, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
+    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
-    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue
     this->send_mutex.lock();
