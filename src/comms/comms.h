@@ -11,6 +11,7 @@
 #define ROS_PKG_LEN     ROS_HEADER_LEN + ROS_FOOTER_LEN
 #define SYNC_FLAG       0xff
 #define VERSION_FLAG    0xfe
+#define MAC_ADDR_LEN    12
 
 enum message_topics{
     MBOT_TIMESYNC = 201, 
@@ -30,6 +31,5 @@ enum message_topics{
 uint8_t checksum(uint8_t* addends, int len);
 int validate_header(uint8_t* header_data);
 int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum);
-int encode_msg(uint8_t* MSG, int msg_len, uint16_t TOPIC, uint8_t* ROSPKT, int rospkt_len);
-
+void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[12], uint8_t* msg_ser, int msg_ser_len);
 #endif

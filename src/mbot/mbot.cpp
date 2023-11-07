@@ -165,12 +165,11 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    twist2D_t_serialize(&this->robot_vel_goal, msg_serialized);
-    packet.data = new uint8_t[msg_len + ROS_PKG_LEN];
-    encode_msg(msg_serialized, msg_len, MBOT_VEL_CMD, packet.data, msg_len + ROS_PKG_LEN);
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
+    twist2D_t_serialize(&robot_vel_goal, msg_serialized);
+    encode_msg(msg_serialized, msg_len, MBOT_VEL_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
-    packet.length = sizeof(robot_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
+    packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -194,11 +193,11 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
-    mbot_motor_vel_t_serialize(&this->motor_vel_goal, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_VEL_CMD, packet.data, msg_len + ROS_PKG_LEN);
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
+    mbot_motor_vel_t_serialize(&motor_vel_goal, msg_serialized);
+    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_VEL_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -228,11 +227,11 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_motor_pwm_t_serialize(&mbot_pwm, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_PWM_CMD, packet.data, msg_len + ROS_PKG_LEN);
+    encode_msg(msg_serialized, msg_len, MBOT_MOTOR_PWM_CMD, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -267,11 +266,11 @@ void mbot::set_odom(float x, float y, float theta)
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     pose2D_t_serialize(&mbot_odom, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, packet.data, msg_len + ROS_PKG_LEN);
+    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -296,11 +295,11 @@ void mbot::reset_odom()
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     pose2D_t_serialize(&mbot_odom, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, packet.data, msg_len + ROS_PKG_LEN);
+    encode_msg(msg_serialized, msg_len, MBOT_ODOMETRY_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -325,11 +324,11 @@ void mbot::set_encoders(int a, int b, int c = 0)
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_encoders_t_serialize(&mbot_encoders, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, packet.data, msg_len + ROS_PKG_LEN);
+    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
     // add to the send queue TODO: figure out how we specify MAC for host to send to
     this->send_mutex.lock();
@@ -354,13 +353,13 @@ void mbot::reset_encoders()
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
     // Serialize message and create packet
+    packet.data = new uint8_t[msg_len + ROS_PKG_LEN + MAC_LENGTH + 1];
     mbot_encoders_t_serialize(&mbot_encoders, msg_serialized);
-    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, packet.data, msg_len + ROS_PKG_LEN);
+    encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, msg_len + ROS_PKG_LEN + MAC_LENGTH + 1);
     delete[] msg_serialized;
     packet.length = sizeof(motor_vel_goal) + ROS_PKG_LEN;
-    std::memcpy(packet.mac_address, this->mac_address, MAC_LENGTH);
 
-    // add to the send queue TODO: figure out how we specify MAC for host to send to
+    // add to the send queue
     this->send_mutex.lock();
     this->send_queue.push(packet);
     this->send_mutex.unlock();
@@ -409,6 +408,10 @@ void mbot::mbot_th()
     {
         char buffer[256];
         // Read data from the device, should get ACK
+        
+        // TODO: Put the bytes into a queue. Each mbot will have their own queue. Need to
+        //       know which mbot the data is for.
+        //       Use std::unordered_map<std::string, mbot *> with the incoming mac address
         int bytes_read = read(serial_port, buffer, sizeof(buffer));
         if (bytes_read > 0)
         {
@@ -450,5 +453,11 @@ void mbot::send_th()
 
 void mbot::data_th()
 {
-    // need to figure out how best to handle this...
+    // TODO: Implement packet parsing. Should following this structure:
+        //       1. Read header
+        //       2. Validate header
+        //       3. Read message
+        //       4. Validate message
+        //       5. Convert message
+        //       6. Update robot object
 }

@@ -33,40 +33,32 @@ int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_
     return valid_message;
 }
 
-int encode_msg(uint8_t* MSG, int msg_len, uint16_t TOPIC, uint8_t* ROSPKT, int rospkt_len) {
-    
-    // SANITY CHECKS
-    if (msg_len+ROS_PKG_LEN != rospkt_len) { 
-        printf("%d != %d", msg_len+ROS_PKG_LEN, rospkt_len);
-        printf("Error: The length of the ROSPKT array does not match the length of the MSG array plus packaging.\n");
-        return 0;
+void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[12], uint8_t* msg_ser, int msg_ser_len) {
+    // check to make sure lengths align
+    if (msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1 != msg_ser_len) {
+        printf("Error: The length of the serialized message array does not match the length of the message array plus packaging.\n");
+        return;
     }
 
+    // add ROS packet header
+    msg_ser[0] = SYNC_FLAG;
+    msg_ser[1] = VERSION_FLAG;
+    msg_ser[2] = (uint8_t) (msg_len % 255);
+    msg_ser[3] = (uint8_t) (msg_len >> 8);
+    uint8_t cs1_addends[2] = {msg_ser[2], msg_ser[3]};
+    msg_ser[4] = checksum(cs1_addends, 2);
 
-    // CREATE ROS PACKET
-    //for ROS protocol and packet format see link: http://wiki.ros.org/rosserial/Overview/Protocol
-    ROSPKT[0] = SYNC_FLAG;
-    ROSPKT[1] = VERSION_FLAG;
-    ROSPKT[2] = (uint8_t) (msg_len%255); //message length lower 8/16b via modulus and cast
-    ROSPKT[3] = (uint8_t) (msg_len>>8); //message length higher 8/16b via bitshift and cast
+    // add topic and message
+    msg_ser[5] = (uint8_t) (topic % 255);
+    msg_ser[6] = (uint8_t) (topic >> 8);
+    memcpy(&msg_ser[ROS_HEADER_LEN], msg, msg_len);
+    uint8_t cs2_addends[msg_len + 2];
+    cs2_addends[0] = msg_ser[5];
+    cs2_addends[1] = msg_ser[6];
+    memcpy(cs2_addends + 2, msg, msg_len);
+    msg_ser[ROS_HEADER_LEN + msg_len] = checksum(cs2_addends, msg_len + 2);
 
-    uint8_t cs1_addends[2] = {ROSPKT[2], ROSPKT[3]};
-    ROSPKT[4] = checksum(cs1_addends, 2); //checksum over message length
-    ROSPKT[5] = (uint8_t) (TOPIC%255); //message topic lower 8/16b via modulus and cast
-    ROSPKT[6] = (uint8_t) (TOPIC>>8); //message length higher 8/16b via bitshift and cast
-
-    for (int i = 0; i<msg_len; i++) { //write message bytes
-        ROSPKT[i+7] = MSG[i];
-    }
-    
-    uint8_t cs2_addends[msg_len+2]; //create array for the checksum over topic and message content
-    cs2_addends[0] = ROSPKT[5];
-    cs2_addends[1] = ROSPKT[6];
-    for (int i = 0; i<msg_len; i++) {
-        cs2_addends[i+2] = MSG[i];
-    }
-
-    ROSPKT[rospkt_len-1] = checksum(cs2_addends, msg_len+2); //checksum over message data and topic
-
-    return 1;
+    // add mac address
+    memcpy(&msg_ser[msg_len + ROS_PKG_LEN], mac_address, MAC_ADDR_LEN);
+    msg_ser[msg_len + ROS_PKG_LEN + MAC_ADDR_LEN] = checksum(mac_address, MAC_ADDR_LEN);
 }

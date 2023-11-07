@@ -86,9 +86,9 @@ private:
     public:
         packet_t();
         ~packet_t();
+        void serialize(uint8_t *data);
         uint8_t *data;
         uint8_t length;
-        mac_address_t mac_address;
     };
 
     // Static variables and functions for robot_thread()
