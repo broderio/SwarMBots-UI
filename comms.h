@@ -1,3 +1,6 @@
+#ifndef COMMS_H
+#define COMMS_H
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -94,3 +97,5 @@ int encode_msg(uint8_t* MSG, int msg_len, uint16_t TOPIC, uint8_t* ROSPKT, int r
 
     return 1;
 }
+
+#endif
