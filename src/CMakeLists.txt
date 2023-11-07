@@ -1,12 +1,10 @@
-add_executable(main main.cpp)
+cmake_minimum_required(VERSION 3.2)
+project(swarmbots-main)
 
 add_subdirectory(comms)
 add_subdirectory(mbot)
-add_subdirectory(mbot_lcm_msgs_serial)
+set(SOURCE_FILES main.cpp)
 
-target_link_libraries(main
-  PRIVATE
-    comms
-    mbot
-    mbot_lcm_msgs_serial
-)
+add_executable(swarmbots-main ${SOURCE_FILES})
+target_link_libraries(swarmbots-main comms mbot)
+install(TARGETS swarmbots-main DESTINATION ${INSTALL_BIN_DIR})

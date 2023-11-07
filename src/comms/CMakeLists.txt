@@ -1,13 +1,12 @@
-add_library(comms "")
+cmake_minimum_required(VERSION 3.5)
+project(comms C CXX)
 
-target_sources(comms
-  PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/comms.c
-  PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/comms.h
+set(SOURCE_FILES
+    comms.h
+    comms.c
 )
 
-target_include_directories(comms
-  PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}
-)
+add_library(comms SHARED STATIC ${SOURCE_FILES})
+
+install(TARGETS comms DESTINATION ${INSTALL_LIB_DIR})
+install(FILES comms.h DESTINATION ${INSTALL_INCLUDE_DIR})

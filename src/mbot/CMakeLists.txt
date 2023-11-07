@@ -1,13 +1,12 @@
-add_library(mbot "")
+cmake_minimum_required(VERSION 3.5)
+project(mbot C CXX)
 
-target_sources(mbot
-  PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/mbot.cpp
-  PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/mbot.hpp
+set(SOURCE_FILES
+    mbot.h
+    mbot.cpp
 )
 
-target_include_directories(mbot
-  PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}
-)
+add_library(mbot SHARED STATIC ${SOURCE_FILES})
+
+install(TARGETS mbot DESTINATION ${INSTALL_LIB_DIR})
+install(FILES mbot.h DESTINATION ${INSTALL_INCLUDE_DIR})

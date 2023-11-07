@@ -73,6 +73,7 @@
         "__nullptr": "cpp",
         "__string": "cpp",
         "compare": "cpp",
-        "concepts": "cpp"
+        "concepts": "cpp",
+        "msgtypes.h": "c"
     }
 }
