@@ -9,6 +9,25 @@ uint8_t checksum(uint8_t* addends, int len) {
     return 255 - ( ( sum ) % 256 );
 }
 
+void read_header(int serial_port, uint8_t* header_data) {
+    uint8_t trigger_val = 0x00;
+    while(trigger_val != 0xff)
+    {
+        read(serial_port, &trigger_val, 1);
+    }
+    header_data[0] = trigger_val;
+    read(serial_port, &header_data[1], ROS_HEADER_LEN - 1);
+}
+
+void read_message(int serial_port, uint8_t* msg_data_serialized, uint16_t message_len, char* topic_msg_data_checksum) {
+    read(serial_port, msg_data_serialized, message_len);
+    read(serial_port, topic_msg_data_checksum, 1);
+}
+
+void read_mac_address(int serial_port, uint8_t* mac_address, uint8_t* checksum_val) {
+    read(serial_port, mac_address, MAC_ADDR_LEN);
+    read(serial_port, checksum_val, 1);
+}
 
 // Function to validate the header
 int validate_header(uint8_t* header_data) {
@@ -18,7 +37,6 @@ int validate_header(uint8_t* header_data) {
     valid_header = valid_header && (cs_msg_len == header_data[4]);
     return valid_header;
 }
-
 
 // Function to validate the message
 int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum) {
@@ -31,6 +49,10 @@ int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_
     uint8_t cs_topic_msg_data = checksum(cs2_addends, message_len + 2); 
     int valid_message = (cs_topic_msg_data == topic_msg_data_checksum);
     return valid_message;
+}
+
+int validate_mac_address(uint8_t* mac_address, uint8_t checksum_val) {
+    return checksum(mac_address, MAC_ADDR_LEN) == checksum_val;
 }
 
 void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[12], uint8_t* msg_ser, int msg_ser_len) {

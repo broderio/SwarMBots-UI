@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
 
 #define ROS_HEADER_LEN  7
 #define ROS_FOOTER_LEN  1 
@@ -29,12 +32,16 @@ enum message_topics{
 };
 
 uint8_t checksum(uint8_t* addends, int len);
-int validate_header(uint8_t* header_data);
-int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+void read_header(int serial_port, uint8_t* header_data);
+void read_message(int serial_port, uint8_t* msg_data_serialized, uint16_t message_len, char* topic_msg_data_checksum);
+void read_mac_address(int serial_port, uint8_t* mac_address, uint8_t* checksum_val);
+int validate_header(uint8_t* header_data);
+int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum);
+int validate_mac_address(uint8_t* mac_address, uint8_t checksum_val);
 void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[12], uint8_t* msg_ser, int msg_ser_len);
 #ifdef __cplusplus
 }

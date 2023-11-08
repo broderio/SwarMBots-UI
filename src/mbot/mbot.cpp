@@ -21,6 +21,12 @@ mbot::thread_safe_t<T>::thread_safe_t()
 }
 
 template <typename T>
+mbot::thread_safe_t<T>::thread_safe_t(T data)
+{
+    this->data = data;
+}
+
+template <typename T>
 mbot::thread_safe_t<T>::~thread_safe_t() {}
 
 template <typename T>
@@ -56,8 +62,9 @@ mbot::packet_t::~packet_t()
 /* mbot member function definitions */
 
 // Set static bool false for initial constructor
-bool mbot::th_running = false;
-std::unordered_map<std::string, mbot *> mbot::mbots; 
+mbot::thread_safe_t<bool> mbot::send_running(false);
+mbot::thread_safe_t<bool> mbot::recv_running(false);
+std::unordered_map<std::string, mbot *> mbot::mbots;
 mbot::thread_safe_t<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
 int mbot::serial_port;
@@ -65,38 +72,37 @@ std::string mbot::port_name;
 
 std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
-std::mutex mbot::recv_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
-std::queue<uint8_t*> mbot::recv_queue;
 std::condition_variable mbot::send_cv;
-std::condition_variable mbot::recv_cv;
 
 // Default constructor for mbot class
-mbot::mbot() {
+mbot::mbot()
+{
     this->name = "mbot";
     this->is_alive = true;
     this->params = mbot_params_t();
-    this->data_th_handle = std::thread(&mbot::data_th, this);
 }
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
 mbot::mbot(const std::string &name, const mac_address_t mac_address, const mbot_params_t &params)
 {
     this->name = name;
-    std::memcpy(this->mac_address, mac_address, MAC_LENGTH);
+    std::memcpy(this->mac_address, mac_address, MAC_ADDR_LEN);
     this->params = params;
     this->is_alive = true;
 
     // Add the robot to the swarm
     mbots.insert(std::pair<std::string, mbot *>(mac_str, this));
 
-    data_th_handle = std::thread(&mbot::data_th, this); // thread for each robot to update itself
+    // Increment the number of robots
+    num_mbots.set(num_mbots.get() + 1);
 
     // Start the thread
-    if (!th_running)
+    if (!send_running.get() && !recv_running.get())
     {
-        th_running = true;
-        mbot_th_handle = std::move(std::thread(&mbot::mbot_th)); // pass 'this' as the first argument
+        send_running.set(true);
+        recv_running.set(true);
+        mbot_th_handle = std::move(std::thread(&mbot::recv_th)); // pass 'this' as the first argument
     }
 }
 
@@ -107,16 +113,18 @@ mbot::~mbot()
     std::string mac_str = mac_to_string(mac_address);
     mbots.erase(mac_str);
 
+    // Decrement the number of robots
+    num_mbots.set(num_mbots.get() - 1);
+
     // Stop the thread if there are no more robots
-    if (mbots.size() == 0)
+    if (num_mbots.get() == 0)
     {
-        th_running = false;
-        // need a clean way to terminate the threads
-        // thinking make a thread safe counter and use a thread safe "is alive"
+        send_running.set(false);
+        recv_running.set(false);
     }
 }
 
-// Converts uin8_t[MAC_LENGTH] to a string where each 2 bytes are separated by semicolons
+// Converts uin8_t[MAC_ADDR_LEN] to a string where each 2 bytes are separated by semicolons
 std::string mbot::mac_to_string(const mac_address_t mac_address)
 {
     std::stringstream ss;
@@ -165,7 +173,7 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_twist2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -193,7 +201,7 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_vel_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -227,7 +235,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_pwm_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -266,7 +274,7 @@ void mbot::set_odom(float x, float y, float theta)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -295,7 +303,7 @@ void mbot::reset_odom()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -324,7 +332,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -353,7 +361,7 @@ void mbot::reset_encoders()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_LENGTH + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -371,8 +379,35 @@ void mbot::reset_encoders()
     send_cv.notify_one();
 }
 
+void mbot::update_mbot(message_topics topic, uint8_t *data)
+{
+    switch (topic)
+    {
+    case MBOT_ODOMETRY:
+        this->odom.set(*((serial_pose2D_t *)data));
+        break;
+    case MBOT_IMU:
+        this->imu.set(*((serial_mbot_imu_t *)data));
+        break;
+    case MBOT_ENCODERS:
+        this->encoders.set(*((serial_mbot_encoders_t *)data));
+        break;
+    case MBOT_MOTOR_VEL:
+        this->motor_vel.set(*((serial_mbot_motor_vel_t *)data));
+        break;
+    case MBOT_MOTOR_PWM:
+        this->motor_pwm.set(*((serial_mbot_motor_pwm_t *)data));
+        break;
+    case MBOT_VEL:
+        this->robot_vel.set(*((serial_twist2D_t *)data));
+        break;
+    default:
+        break;
+    }
+}
+
 // Reads all incoming data on USB
-void mbot::mbot_th()
+void mbot::recv_th()
 {
     // open com port host is connected to
     // get host mac address and save it
@@ -407,30 +442,42 @@ void mbot::mbot_th()
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
-    while (1)
+    while (recv_running.get())
     {
         char buffer[256];
         // Read data from the device, should get ACK
-        
-        // TODO: Put the bytes into a queue. Each mbot will have their own queue. Need to
-        //       know which mbot the data is for.
-        //       Use std::unordered_map<std::string, mbot *> with the incoming mac address
-        int bytes_read = read(serial_port, buffer, sizeof(buffer));
-        if (bytes_read > 0)
-        {
-            uint8_t* data = new uint8_t[bytes_read];
-            std::memcpy(data, buffer, bytes_read);
-            recv_mutex.lock();
-            recv_queue.push(data);
-            recv_mutex.unlock();
-            recv_cv.notify_one();
-        }
+
+        uint8_t header_data[ROS_HEADER_LEN];
+        read_header(serial_port, header_data);
+        if (!validate_header(header_data))
+            continue; // continue if header is invalid
+
+        uint16_t message_len = ((uint16_t)header_data[3] << 8) + (uint16_t)header_data[2];
+        uint16_t topic_id = ((uint16_t)header_data[6] << 8) + (uint16_t)header_data[5];
+        uint8_t msg_data_serialized[message_len];
+        char topic_msg_data_checksum = 0;
+        read_message(serial_port, msg_data_serialized, message_len, &topic_msg_data_checksum);
+        if (!validate_message(header_data, msg_data_serialized, message_len, topic_msg_data_checksum))
+            continue;
+
+        mac_address_t mac_address;
+        uint8_t checksum_val;
+        read_mac_address(serial_port, mac_address, &checksum_val);
+        if (!validate_mac_address(mac_address, checksum_val))
+            continue;
+
+        std::string mac_str = mac_to_string(mac_address);
+        if (mbots.find(mac_str) == mbots.end())
+            continue; // continue if robot is not in swarm
+        mbot *curr_mbot = mbots[mac_str];
+
+        curr_mbot->update_mbot((message_topics)topic_id, msg_data_serialized);
     }
 }
 
 void mbot::send_th()
 {
-    while (1)
+    while (send_running.get())
     {
         packet_t packet;
         { // scope for which we need the lock on the queue
@@ -451,45 +498,5 @@ void mbot::send_th()
         {
             printf("Sent %ld bytes\n", bytes_written);
         }
-    }
-}
-
-void mbot::data_th()
-{
-    // TODO: Implement packet parsing. Should following this structure:
-        //       1. Read header
-        //       2. Validate header
-        //       3. Read message
-        //       4. Validate message
-        //       5. Convert message
-        //       6. Update robot object
-    while (1)
-    {
-        uint8_t* msg;
-        { // scope for which we need the lock on the queue
-            std::unique_lock<std::mutex> queue_lock(recv_mutex);
-            while (recv_queue.empty())
-            {
-                recv_cv.wait(queue_lock);
-            }
-            msg = recv_queue.front();
-            recv_queue.pop();
-        }
-
-        // TODO: Read header of msg and validate
-
-
-        // TODO: Read actual message and validate
-
-
-        // TODO: Read incoming MAC address and validate
-
-
-        // TODO: Convert message to serial_*_t given the topic specified by the header
-
-
-        // TODO: Update mbot with corresponding MAC address with new data
-
-        delete[] msg;
     }
 }
