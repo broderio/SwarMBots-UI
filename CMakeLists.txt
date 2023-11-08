@@ -20,6 +20,5 @@ include_directories(${MBOT_HEADERS_DIR})
 include_directories(${LCM_HEADERS_DIR})
 
 add_subdirectory(src)
-# add_subdirectory(test)
 
 
