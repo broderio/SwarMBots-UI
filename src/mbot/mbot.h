@@ -95,15 +95,14 @@ private:
 
     static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
 
+    static thread_safe_t<bool> running; // set true on the first instatiated mbot object
     static void recv_th();  // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
-    static thread_safe_t<bool> recv_running; // set true on the first instatiated mbot object
     static std::thread mbot_th_handle;
-    static std::thread send_th_handle;
     static int serial_port;
     static std::string port_name;
 
     static void send_th(); // thread to send updates to host via serial
-    static thread_safe_t<bool> send_running; // set true on the first instatiated mbot object
+    static std::thread send_th_handle;
     static std::mutex send_mutex;
     static std::queue<packet_t> send_queue; // queue containing packets to be sent
     static std::condition_variable send_cv; // condition variable to waken the send thread
