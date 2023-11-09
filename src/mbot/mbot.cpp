@@ -443,6 +443,16 @@ void mbot::recv_th()
     send_th_handle = std::thread(&mbot::send_th);
     while (running.get())
     {
+        char buffer[256];
+        // Read data from the device, should get ACK
+
+        mac_address_t mac_address;
+        uint8_t checksum_val;
+        uint16_t pkt_len;
+        read_mac_address(serial_port, mac_address, &pkt_len, &checksum_val);
+        if (!validate_mac_address(mac_address, checksum_val))
+            continue;
+
         uint8_t header_data[ROS_HEADER_LEN];
         read_header(serial_port, header_data);
         if (!validate_header(header_data))
@@ -454,12 +464,6 @@ void mbot::recv_th()
         char topic_msg_data_checksum = 0;
         read_message(serial_port, msg_data_serialized, message_len, &topic_msg_data_checksum);
         if (!validate_message(header_data, msg_data_serialized, message_len, topic_msg_data_checksum))
-            continue;
-
-        mac_address_t mac_address;
-        uint8_t checksum_val;
-        read_mac_address(serial_port, mac_address, &checksum_val);
-        if (!validate_mac_address(mac_address, checksum_val))
             continue;
 
         std::string mac_str = mac_to_string(mac_address);
