@@ -62,8 +62,7 @@ mbot::packet_t::~packet_t()
 /* mbot member function definitions */
 
 // Set static bool false for initial constructor
-mbot::thread_safe_t<bool> mbot::send_running(false);
-mbot::thread_safe_t<bool> mbot::recv_running(false);
+mbot::thread_safe_t<bool> mbot::running(false);
 std::unordered_map<std::string, mbot *> mbot::mbots;
 mbot::thread_safe_t<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
@@ -90,7 +89,6 @@ mbot::mbot(const std::string &name, const mac_address_t mac_address, const mbot_
     std::memcpy(this->mac_address, mac_address, MAC_ADDR_LEN);
     this->params = params;
     this->is_alive = true;
-
     // Add the robot to the swarm
     mbots.insert(std::pair<std::string, mbot *>(mac_str, this));
 
@@ -98,10 +96,10 @@ mbot::mbot(const std::string &name, const mac_address_t mac_address, const mbot_
     num_mbots.set(num_mbots.get() + 1);
 
     // Start the thread
-    if (!send_running.get() && !recv_running.get())
+    if (!running.get())
     {
-        send_running.set(true);
-        recv_running.set(true);
+        //TODO: read the txt file containing the mac addresses of the clients and initialize map
+        running.set(true);
         mbot_th_handle = std::move(std::thread(&mbot::recv_th)); // pass 'this' as the first argument
     }
 }
@@ -119,8 +117,9 @@ mbot::~mbot()
     // Stop the thread if there are no more robots
     if (num_mbots.get() == 0)
     {
-        send_running.set(false);
-        recv_running.set(false);
+        running.set(false);
+        send_th_handle.join();
+        mbot_th_handle.join();
     }
 }
 
@@ -442,7 +441,7 @@ void mbot::recv_th()
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
-    while (recv_running.get())
+    while (running.get())
     {
         char buffer[256];
         // Read data from the device, should get ACK
@@ -478,7 +477,7 @@ void mbot::recv_th()
 
 void mbot::send_th()
 {
-    while (send_running.get())
+    while (running.get())
     {
         packet_t packet;
         { // scope for which we need the lock on the queue
