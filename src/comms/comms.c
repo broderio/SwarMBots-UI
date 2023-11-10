@@ -29,7 +29,6 @@ void read_message(int serial_port, uint8_t* msg_data_serialized, uint16_t messag
     read(serial_port, topic_msg_data_checksum, 1);
 }
 
-
 // Function to validate the header
 int validate_header(uint8_t* header_data) {
     int valid_header = (header_data[1] == 0xfe);

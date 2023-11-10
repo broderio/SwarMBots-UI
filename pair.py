@@ -13,13 +13,13 @@ def main():
     macs = open('macs.txt', 'a')
 
     while True:
-        line = ser.readline()
+        line = ser.readline().decode('utf-8')
         
         mac_address_pattern = r"([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})"
         m = re.search(mac_address_pattern, line)
         if m:
             addr = m.group(0)
-            macs.write(addr)
+            macs.write(addr + '\n')
             macs.flush()
             
             print(addr)
