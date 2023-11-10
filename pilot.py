@@ -18,7 +18,6 @@ def create_pkt(mac: str) -> bytes:
     msg.extend(struct.pack('B', SYNC_FLAG)) # 8 bit unsigned integer, msg[0]
     msg.extend(reversed(struct.pack('H', 16))) # 16 bit unsigned integer, msg[1:3]
     msg.extend(mac_str_to_bytes(mac)) # 6 byte MAC address, msg[3:9]
-    msg.extend(struct.pack('B', checksum(msg[1:9]))) # 8 bit unsigned integer, msg[9]
     
     msg.extend(struct.pack('B', SYNC_FLAG)) # 8 bit unsigned integer, msg[10]
     msg.extend(struct.pack('B', VERSION_FLAG)) # 8 bit unsigned integer, msg[11]

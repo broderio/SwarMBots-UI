@@ -449,9 +449,7 @@ void mbot::recv_th()
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
-        read_mac_address(serial_port, mac_address, &pkt_len, &checksum_val);
-        if (!validate_mac_address(mac_address, checksum_val))
-            continue;
+        read_mac_address(serial_port, mac_address, &pkt_len);
 
         uint8_t header_data[ROS_HEADER_LEN];
         read_header(serial_port, header_data);
