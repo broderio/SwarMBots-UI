@@ -6,7 +6,7 @@ set(SOURCE_FILES
     comms.c
 )
 
-add_library(comms SHARED STATIC ${SOURCE_FILES})
+add_library(comms STATIC ${SOURCE_FILES})
 
 install(TARGETS comms DESTINATION ${INSTALL_LIB_DIR})
 install(FILES comms.h DESTINATION ${INSTALL_INCLUDE_DIR})

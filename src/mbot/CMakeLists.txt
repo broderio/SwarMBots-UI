@@ -6,7 +6,7 @@ set(SOURCE_FILES
     mbot.cpp
 )
 
-add_library(mbot SHARED STATIC ${SOURCE_FILES})
+add_library(mbot STATIC ${SOURCE_FILES})
 
 install(TARGETS mbot DESTINATION ${INSTALL_LIB_DIR})
 install(FILES mbot.h DESTINATION ${INSTALL_INCLUDE_DIR})
