@@ -1,3 +1,6 @@
+#ifndef MBOT_H
+#define MBOT_H
+
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -109,3 +112,5 @@ private:
     static std::queue<packet_t> send_queue; // queue containing packets to be sent
     static std::condition_variable send_cv; // condition variable to waken the send thread
 };
+
+#endif
