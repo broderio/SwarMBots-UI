@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <chrono>
+#include <thread>
 
 #include "mbot.h"
 
@@ -83,7 +85,7 @@ mbot::mbot()
 }
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
-mbot::mbot(const std::string &name, const mac_address_t mac_address, const mbot_params_t &params)
+mbot::mbot(const std::string &name, const mac_address_t mac_address, const std::string &port_in, const mbot_params_t &params)
 {
     this->name = name;
     std::memcpy(this->mac_address, mac_address, MAC_ADDR_LEN);
@@ -99,9 +101,13 @@ mbot::mbot(const std::string &name, const mac_address_t mac_address, const mbot_
     if (!running.get())
     {
         //TODO: read the txt file containing the mac addresses of the clients and initialize map
+        port_name = port_in;
         running.set(true);
         mbot_th_handle = std::move(std::thread(&mbot::recv_th)); // pass 'this' as the first argument
     }
+
+    //tell the host theres a new mac address
+    this->send_timesync();
 }
 
 // Destructor for mbot class. This function is not thread safe! Mbots should be not be freed concurrently.
@@ -367,6 +373,36 @@ void mbot::reset_encoders()
     // Serialize message and create packet
     mbot_encoders_t_serialize(&mbot_encoders, msg_serialized);
     encode_msg(msg_serialized, msg_len, MBOT_ENCODERS_RESET, this->mac_address, packet.data, packet.length);
+    delete[] msg_serialized;
+
+    // add to the send queue
+    this->send_mutex.lock();
+    this->send_queue.push(packet);
+    this->send_mutex.unlock();
+
+    // alert the send thread there is work to do
+    send_cv.notify_one();
+}
+
+void mbot::send_timesync(){
+    serial_timestamp_t timestamp;
+    auto currentTimePoint = std::chrono::high_resolution_clock::now();
+    // Get the time since epoch in microseconds
+    auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint)
+                                      .time_since_epoch()
+                                      .count();
+    timestamp.utime = microsecondsSinceEpoch;
+
+    // Initialize variables for packet
+    packet_t packet;
+    size_t msg_len = sizeof(serial_timestamp_t);
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.data = new uint8_t[packet.length];
+    uint8_t *msg_serialized = new uint8_t[msg_len];
+
+    // Serialize message and create packet
+    timestamp_t_serialize(&timestamp, msg_serialized);
+    encode_msg(msg_serialized, msg_len, MBOT_TIMESYNC, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
 
     // add to the send queue

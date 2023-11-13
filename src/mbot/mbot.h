@@ -18,7 +18,7 @@ class mbot
 {
 public:
     mbot();
-    mbot(const std::string &name, const mac_address_t mac_address, const mbot_params_t &params);
+    mbot(const std::string&, const mac_address_t, const std::string& , const mbot_params_t&);
     ~mbot();
 
     serial_twist2D_t get_robot_vel();
@@ -39,6 +39,8 @@ public:
     void reset_odom();
     void set_encoders(int a, int b, int c);
     void reset_encoders();
+
+    void send_timesync();
 
     drive_mode_t drive_mode;
     mbot_params_t params;
