@@ -178,7 +178,7 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_twist2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -206,7 +206,7 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_vel_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -240,7 +240,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_motor_pwm_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -279,7 +279,7 @@ void mbot::set_odom(float x, float y, float theta)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -308,7 +308,7 @@ void mbot::reset_odom()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_pose2D_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -337,7 +337,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -366,7 +366,7 @@ void mbot::reset_encoders()
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_mbot_encoders_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN+ 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -396,7 +396,7 @@ void mbot::send_timesync(){
     // Initialize variables for packet
     packet_t packet;
     size_t msg_len = sizeof(serial_timestamp_t);
-    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 1;
+    packet.length = msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3;
     packet.data = new uint8_t[packet.length];
     uint8_t *msg_serialized = new uint8_t[msg_len];
 
@@ -447,7 +447,7 @@ void mbot::recv_th()
     // open com port host is connected to
     // get host mac address and save it
     struct termios tty;
-    port_name.replace(0, 3, "/dev/tty");
+    port_name.replace(0, 3, "/dev/ttyS");
     serial_port = open(port_name.c_str(), O_RDWR);
     if (serial_port == -1)
     {
