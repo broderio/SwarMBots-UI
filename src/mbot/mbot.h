@@ -87,7 +87,9 @@ private:
     {
     public:
         packet_t();
+        packet_t(const packet_t&);
         ~packet_t();
+        packet_t& operator=(const packet_t& other);
         uint8_t *data;
         uint8_t length;
     };

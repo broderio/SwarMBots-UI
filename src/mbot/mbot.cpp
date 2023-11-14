@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 #include "mbot.h"
 
@@ -53,12 +54,25 @@ mbot::packet_t::packet_t()
     length = 0;
 }
 
+mbot::packet_t::packet_t(const mbot::packet_t& other){
+    this->data = new uint8_t[other.length];
+    *this->data = *other.data;
+    this->length = other.length;
+}
+
 mbot::packet_t::~packet_t()
 {
     if (data != nullptr)
     {
         delete[] data;
     }
+}
+
+mbot::packet_t& mbot::packet_t::operator=(const mbot::packet_t& other){
+    this->data = new uint8_t[other.length];
+    *this->data = *other.data;
+    this->length = other.length;
+    return *this;
 }
 
 /* mbot member function definitions */
