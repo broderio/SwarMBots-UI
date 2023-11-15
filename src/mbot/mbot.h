@@ -21,34 +21,34 @@ class mbot
 {
 public:
     mbot();
-    mbot(const std::string&, const mac_address_t, const std::string& , const mbot_params_t&);
+    mbot(const std::string &, const std::string &, const mbot_params_t &);
     ~mbot();
+    mbot(const mbot &);
+
+    static std::string port;
+
+    static std::vector<mbot> init_from_file(const std::string &filename);
 
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();
     serial_mbot_motor_vel_t get_motor_vel();
-
     serial_twist2D_t get_robot_vel_goal();
-    serial_mbot_motor_vel_t get_motor_vel_goal();
     void set_robot_vel_goal(float vx, float vy, float wz);
+    serial_mbot_motor_vel_t get_motor_vel_goal();
     void set_motor_vel_goal(float a, float b, float c);
-
     serial_mbot_motor_pwm_t get_motor_pwm();
     void set_motor_pwm(float a, float b, float c);
-
     serial_pose2D_t get_odom();
-    serial_mbot_encoders_t get_encoders();
     void set_odom(float x, float y, float theta);
     void reset_odom();
+    serial_mbot_encoders_t get_encoders();
     void set_encoders(int a, int b, int c);
     void reset_encoders();
-
     void send_timesync();
 
     drive_mode_t drive_mode;
     mbot_params_t params;
     mac_address_t mac_address;
-    const std::string mac_str;
     std::string name;
     int is_alive;
 
@@ -69,44 +69,42 @@ private:
         std::mutex mtx;
     };
 
+    // Packet object
+    class packet_t
+    {
+    public:
+        packet_t();
+        packet_t(const packet_t &);
+        ~packet_t();
+        packet_t &operator=(const packet_t &other);
+        uint8_t *data;
+        uint8_t length;
+    };
+
     thread_safe_t<serial_twist2D_t> robot_vel;
     thread_safe_t<serial_mbot_imu_t> imu;
     thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
     thread_safe_t<serial_mbot_motor_pwm_t> motor_pwm;
     thread_safe_t<serial_pose2D_t> odom;
     thread_safe_t<serial_mbot_encoders_t> encoders;
-
     serial_twist2D_t robot_vel_goal;
     serial_mbot_motor_vel_t motor_vel_goal;
 
     // Mutex for USB
     std::mutex usb_mtx;
 
-    // Packet object
-    class packet_t
-    {
-    public:
-        packet_t();
-        packet_t(const packet_t&);
-        ~packet_t();
-        packet_t& operator=(const packet_t& other);
-        uint8_t *data;
-        uint8_t length;
-    };
+    void update_mbot(uint8_t *data);
 
-    void update_mbot(message_topics topic, uint8_t *data);
-
-    // Static variables and functions for robot_thread()
-    static std::string mac_to_string(const mac_address_t mac_address); // converts mac_address_t to std::string
-    static std::unordered_map<std::string, mbot *> mbots;       // contains pointers to all instatiated mbot objects
+    static std::string mac_to_string(const mac_address_t mac_address);                // converts mac_address_t to std::string
+    static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
+    static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
 
     static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
 
     static thread_safe_t<bool> running; // set true on the first instatiated mbot object
-    static void recv_th();  // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
+    static void recv_th();              // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
     static std::thread mbot_th_handle;
     static int serial_port;
-    static std::string port_name;
 
     static void send_th(); // thread to send updates to host via serial
     static std::thread send_th_handle;

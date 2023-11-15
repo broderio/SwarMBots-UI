@@ -38,14 +38,8 @@ int validate_header(uint8_t* header_data) {
 }
 
 // Function to validate the message
-int validate_message(uint8_t* header_data, uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum) {
-    uint8_t cs2_addends[message_len + 2]; 
-    cs2_addends[0] = header_data[5];
-    cs2_addends[1] = header_data[6];
-    for (int i = 0; i < message_len; i++) {
-        cs2_addends[i + 2] = msg_data_serialized[i];
-    }
-    uint8_t cs_topic_msg_data = checksum(cs2_addends, message_len + 2); 
+int validate_message(uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum) {
+    uint8_t cs_topic_msg_data = checksum(msg_data_serialized, message_len); 
     int valid_message = (cs_topic_msg_data == topic_msg_data_checksum);
     return valid_message;
 }
