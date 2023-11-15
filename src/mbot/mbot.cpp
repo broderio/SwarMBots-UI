@@ -56,7 +56,9 @@ mbot::packet_t::packet_t()
 
 mbot::packet_t::packet_t(const mbot::packet_t& other){
     this->data = new uint8_t[other.length];
-    *this->data = *other.data;
+    for (int i = 0; i < other.length; i++) {
+        this->data[i] = other.data[i];
+    }
     this->length = other.length;
 }
 
@@ -70,7 +72,9 @@ mbot::packet_t::~packet_t()
 
 mbot::packet_t& mbot::packet_t::operator=(const mbot::packet_t& other){
     this->data = new uint8_t[other.length];
-    *this->data = *other.data;
+    for (int i = 0; i < other.length; i++) {
+        this->data[i] = other.data[i];
+    }
     this->length = other.length;
     return *this;
 }
@@ -147,13 +151,10 @@ mbot::~mbot()
 std::string mbot::mac_to_string(const mac_address_t mac_address)
 {
     std::stringstream ss;
-    for (int i = 0; i < 12; ++i)
+    for (int i = 0; i < 6; ++i)
     {
-        if (i > 0 && i % 2 == 0)
-        {
-            ss << ':';
-        }
         ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mac_address[i]);
+        if (i != 5) ss << ':';
     }
     return ss.str();
 }
@@ -401,6 +402,7 @@ void mbot::reset_encoders()
 void mbot::send_timesync(){
     serial_timestamp_t timestamp;
     auto currentTimePoint = std::chrono::high_resolution_clock::now();
+    
     // Get the time since epoch in microseconds
     auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint)
                                       .time_since_epoch()
@@ -421,6 +423,7 @@ void mbot::send_timesync(){
 
     // add to the send queue
     this->send_mutex.lock();
+    std::cout << "adding to queue\n";
     this->send_queue.push(packet);
     this->send_mutex.unlock();
 
@@ -477,7 +480,7 @@ void mbot::recv_th()
         return;
     }
 
-    tty.c_cflag = B115200; // Set your desired baud rate
+    tty.c_cflag = B921600; // Set your desired baud rate
     tty.c_cflag |= CS8;    // 8-bit data
     tty.c_cflag |= CLOCAL; // Ignore modem control lines
     tty.c_cflag |= CREAD;  // Enable receiver
@@ -545,6 +548,15 @@ void mbot::send_th()
         else
         {
             printf("Sent %ld bytes\n", bytes_written);
+            char buffer[256];
+            // Read data from the device, should get ACK
+            if (bytes_written == 25){
+                int bytes_read = read(serial_port, buffer, sizeof(buffer));
+                if (bytes_read > 0) {
+                    buffer[bytes_read] = '\0';
+                    printf("Received: %s", buffer);
+                }
+            }
         }
     }
 }

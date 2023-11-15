@@ -54,7 +54,7 @@ int validate_mac_address(uint8_t* mac_address, uint8_t checksum_val) {
     return checksum(mac_address, MAC_ADDR_LEN) == checksum_val;
 }
 
-void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[12], uint8_t* msg_ser, int msg_ser_len) {
+void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len) {
     // check to make sure lengths align
     if (MAC_ADDR_LEN + 3 + msg_len + ROS_PKG_LEN != msg_ser_len) {
         printf("Error: The length of the serialized message array does not match the length of the message array plus packaging.\n");

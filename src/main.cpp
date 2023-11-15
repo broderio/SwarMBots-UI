@@ -7,10 +7,10 @@ using std::cin;
 
 int main() {
     mbot_params_t mbot_params;
-    uint8_t g[MAC_ADDR_LEN] = {0xF4,0x12,0xFA,0xFA,0x07,0x51};
-    uint8_t h[MAC_ADDR_LEN] = {0x48,0x27,0xE2,0xFD,0x65,0xD1};
-    mbot mbotG("Gerald", g, "COM16", mbot_params);
-    mbot mbotH("Henry", h, "COM16", mbot_params);
+    uint8_t g[MAC_ADDR_LEN] = {0xEC, 0xDA, 0x3B, 0x46, 0x83, 0x05};
+    //uint8_t h[MAC_ADDR_LEN] = {0x48,0x27,0xE2,0xFD,0x65,0xD1};
+    mbot mbotG("Gerald", g, "COM17", mbot_params);
+    //mbot mbotH("Henry", h, "COM17", mbot_params);
     serial_twist2D_t curr_vel;
     char ans = 'n';
     while (ans != 'y'){
@@ -18,15 +18,20 @@ int main() {
         cin >> ans;
     }
     while(1){
-        cout << "Henry turning left\n";
-        mbotH.set_robot_vel_goal(0, 0, 5);
-        sleep(5);
         cout << "Gerald turning right\n";
         mbotG.set_robot_vel_goal(0,0,-5);
         sleep(5);
-        cout << "stopping both\n";
-        mbotH.set_robot_vel_goal(0,0,0);
+
+        cout << "stopping\n";
         mbotG.set_robot_vel_goal(0,0,0);
-        sleep(20);
+        sleep(5);
+
+        cout << "Gerald left\n";
+        mbotG.set_robot_vel_goal(0,0,5);
+        sleep(5);
+
+        cout << "Gerald stopping\n";
+        mbotG.set_robot_vel_goal(0,0,0);
+        sleep(5);
     }
 }

@@ -35,7 +35,7 @@ def main():
         exit(1)
 
     port_name = sys.argv[1]
-    ser = serial.Serial(port_name, 115200)
+    ser = serial.Serial(port_name, 921600)
 
     macs = open('macs.txt', 'r')
     mac_list = macs.readlines()
