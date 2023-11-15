@@ -13,7 +13,7 @@
 
 #include "msgtypes.h"
 #include "mbot_params.h"
-#include "../comms/comms.h"
+#include "comms.h"
 
 using mac_address_t = uint8_t[MAC_ADDR_LEN];
 
@@ -81,6 +81,16 @@ private:
         uint8_t length;
     };
 
+    // Wrapper packet for serial data
+    struct __attribute__((__packed__)) packets_wrapper_t {
+        serial_mbot_encoders_t encoders;
+        serial_pose2D_t odom;
+        serial_mbot_imu_t imu;
+        serial_twist2D_t mbot_vel;
+        serial_mbot_motor_vel_t motor_vel;
+        serial_mbot_motor_pwm_t motor_pwm;
+    };
+
     thread_safe_t<serial_twist2D_t> robot_vel;
     thread_safe_t<serial_mbot_imu_t> imu;
     thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
@@ -111,6 +121,13 @@ private:
     static std::mutex send_mutex;
     static std::queue<packet_t> send_queue; // queue containing packets to be sent
     static std::condition_variable send_cv; // condition variable to waken the send thread
+
+    // Functions moved from comms.h
+    static void read_mac_address(uint8_t* mac_address, uint16_t* pkt_len);
+    static void read_message(uint8_t* msg_data_serialized, uint16_t message_len, char* topic_msg_data_checksum);
+    static int validate_message(uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum);
+    static void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len);
+    static uint8_t checksum(uint8_t* addends, int len);
 };
 
 #endif
