@@ -78,7 +78,16 @@ mbot::packet_t::~packet_t()
 
 mbot::packet_t &mbot::packet_t::operator=(const mbot::packet_t &other)
 {
-    *this = packet_t(other);
+    if (this != &other)
+    {
+        if (data != nullptr)
+        {
+            delete[] data;
+        }
+        this->data = new uint8_t[other.length];
+        std::memcpy(this->data, other.data, other.length);
+        this->length = other.length;
+    }
     return *this;
 }
 
@@ -97,10 +106,6 @@ std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
-
-// Default constructor for mbot class
-mbot::mbot()
-    : mbot("mbot", "00:00:00:00:00:00", mbot_params_t()) {}
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
 mbot::mbot(const std::string &name, const std::string &mac_address, const mbot_params_t &params)
@@ -273,10 +278,12 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     encode_msg(msg_serialized, msg_len, MBOT_VEL_CMD, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
 
-    // add to the send queue TODO: figure out how we specify MAC for host to send to
+    // add to the send queue
+    std::cout << "Adding packet to send queue\n";
     this->send_mutex.lock();
     this->send_queue.push(packet);
     this->send_mutex.unlock();
+    std::cout << "Packet enqueued\n";
 
     // alert the send thread there is work to do
     this->send_cv.notify_one();
@@ -335,7 +342,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     encode_msg(msg_serialized, msg_len, MBOT_MOTOR_PWM_CMD, this->mac_address, packet.data, packet.length);
     delete[] msg_serialized;
 
-    // add to the send queue TODO: figure out how we specify MAC for host to send to
+    // add to the send queue
     this->send_mutex.lock();
     this->send_queue.push(packet);
     this->send_mutex.unlock();
@@ -474,7 +481,7 @@ void mbot::send_timesync()
 {
     serial_timestamp_t timestamp;
 
-    timestamp.utime = start_time.get() - get_time_millis();
+    timestamp.utime = get_time_millis() - start_time.get();
 
     // Initialize variables for packet
     packet_t packet;
@@ -490,7 +497,6 @@ void mbot::send_timesync()
 
     // add to the send queue
     this->send_mutex.lock();
-    std::cout << "adding to queue\n";
     this->send_queue.push(packet);
     this->send_mutex.unlock();
 
@@ -669,9 +675,14 @@ void mbot::send_th()
             {
                 send_cv.wait(queue_lock);
             }
+            std::cout << "Received packet, queue size =" << send_queue.size() << std::endl;
             packet = send_queue.front();
+            std::cout << "Popping packet\n";
             send_queue.pop();
+            std::cout << "Popped packet from queue\n";
         }
+        
+        std::cout << "Writing to serial port\n";
         ssize_t bytes_written = write(serial_port, packet.data, packet.length);
         if (bytes_written < 0)
         {

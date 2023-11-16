@@ -6,17 +6,10 @@ using std::cin;
 
 int main() {
     mbot_params_t mbot_params;
-    mbot::port = "/dev/cu.usbserial-14110"; // This works on macOS
+    mbot::port = "/dev/cu.usbserial-14210"; // This works on macOS
 
-    std::vector<mbot> mbot_list = mbot::init_from_file();
-
-    serial_twist2D_t curr_vel;
-    char ans = 'n';
-    // while (ans != 'y'){
-    //     cout << "ready? [y/n]\n";
-    //     cin >> ans;
-    // }
-
+    std::vector<mbot> mbot_list = mbot::init_from_file("/Users/broderio/Repositories/SwarMBots-UI/macs.txt");
+    // std::cout << "mbot_list.size() = " << mbot_list.size() << std::endl;
     while(1){
         cout << "Gerald turning right\n";
         mbot_list[0].set_robot_vel_goal(0,0,-5);
