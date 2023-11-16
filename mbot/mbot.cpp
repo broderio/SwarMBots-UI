@@ -91,6 +91,7 @@ mbot::thread_safe_t<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
 int mbot::serial_port;
 std::string mbot::port;
+mbot::thread_safe_t<uint64_t> mbot::start_time;
 
 std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
@@ -99,12 +100,7 @@ std::condition_variable mbot::send_cv;
 
 // Default constructor for mbot class
 mbot::mbot()
-{
-    this->start_time = get_time_millis();
-    this->name = "mbot";
-    this->is_alive = true;
-    this->params = mbot_params_t();
-}
+    : mbot("mbot", "00:00:00:00:00:00", mbot_params_t()) {}
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
 mbot::mbot(const std::string &name, const std::string &mac_address, const mbot_params_t &params)
@@ -124,10 +120,15 @@ mbot::mbot(const std::string &name, const std::string &mac_address, const mbot_p
     if (!running.get())
     {
         running.set(true);
-        mbot_th_handle = std::move(std::thread(&mbot::recv_th)); // pass 'this' as the first argument
+
+        // Set start time for timesync offset
+        start_time.set(get_time_millis());
+
+        // Start the thread
+        mbot_th_handle = std::move(std::thread(&mbot::recv_th));
     }
 
-    // tell the host theres a new mac address
+    // Send timesync to pair client with host
     this->send_timesync();
 }
 
@@ -472,8 +473,8 @@ void mbot::reset_encoders()
 void mbot::send_timesync()
 {
     serial_timestamp_t timestamp;
-    
-    timestamp.utime = start_time - get_time_millis();
+
+    timestamp.utime = start_time.get() - get_time_millis();
 
     // Initialize variables for packet
     packet_t packet;
@@ -579,7 +580,7 @@ void mbot::encode_msg(uint8_t *msg, int msg_len, uint16_t topic, uint8_t mac_add
     msg_ser[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
 }
 
-static uint64_t get_time_millis()
+uint64_t mbot::get_time_millis()
 {
     auto currentTimePoint = std::chrono::high_resolution_clock::now();
     auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint);
@@ -632,9 +633,6 @@ void mbot::recv_th()
         perror("Error from tcsetattr");
         return;
     }
-    
-    // Set start time for timesync offset
-    mbot::start_time = get_time_millis()
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);

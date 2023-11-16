@@ -130,8 +130,8 @@ private:
     static uint8_t checksum(uint8_t* addends, int len);
 
     // Other functions and members
-    static long long start_time;
-    static long long get_time_millis();
+    static thread_safe_t<uint64_t> start_time;
+    static uint64_t get_time_millis();
 };
 
 #endif
