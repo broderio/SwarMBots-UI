@@ -27,7 +27,7 @@ public:
 
     static std::string port;
 
-    static std::vector<mbot> init_from_file(const std::string &filename);
+    static std::vector<mbot> init_from_file(const std::string &filename="macs.txt");
 
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();
@@ -128,6 +128,10 @@ private:
     static int validate_message(uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum);
     static void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len);
     static uint8_t checksum(uint8_t* addends, int len);
+
+    // Other functions and members
+    static long long start_time;
+    static long long get_time_millis();
 };
 
 #endif

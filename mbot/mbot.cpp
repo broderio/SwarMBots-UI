@@ -100,6 +100,7 @@ std::condition_variable mbot::send_cv;
 // Default constructor for mbot class
 mbot::mbot()
 {
+    this->start_time = get_time_millis();
     this->name = "mbot";
     this->is_alive = true;
     this->params = mbot_params_t();
@@ -135,7 +136,7 @@ mbot::~mbot()
 {
     // Remove the robot from the swarm
     // This check occurs because of the copy constructor.
-    // Because they share the same MAC address, we only 
+    // Because they share the same MAC address, we only
     // want to remove the robot if it is the most recent copy.
     std::string mac_str = mac_to_string(mac_address);
     if (mbots[mac_str] == this)
@@ -172,7 +173,7 @@ mbot::mbot(const mbot &other)
     mbots[mac_str] = this;
 }
 
-std::vector<mbot> mbot::init_from_file(const std::string &filename = "macs.txt")
+std::vector<mbot> mbot::init_from_file(const std::string &filename)
 {
     // Given a file with a list of MAC addresses, return an array of mbots
     std::ifstream file(filename);
@@ -471,13 +472,8 @@ void mbot::reset_encoders()
 void mbot::send_timesync()
 {
     serial_timestamp_t timestamp;
-    auto currentTimePoint = std::chrono::high_resolution_clock::now();
-
-    // Get the time since epoch in microseconds
-    auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint)
-                                      .time_since_epoch()
-                                      .count();
-    timestamp.utime = microsecondsSinceEpoch;
+    
+    timestamp.utime = start_time - get_time_millis();
 
     // Initialize variables for packet
     packet_t packet;
@@ -514,18 +510,21 @@ void mbot::update_mbot(uint8_t *data)
 
 // comms.h functions
 
-uint8_t mbot::checksum(uint8_t* addends, int len) {
-    //takes in an array and sums the contents then checksums the array
+uint8_t mbot::checksum(uint8_t *addends, int len)
+{
+    // takes in an array and sums the contents then checksums the array
     int sum = 0;
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++)
+    {
         sum += addends[i];
     }
-    return 255 - ( ( sum ) % 256 );
+    return 255 - ((sum) % 256);
 }
 
-void mbot::read_mac_address(uint8_t* mac_address, uint16_t* pkt_len) {
+void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
+{
     uint8_t trigger_val = 0x00;
-    while(trigger_val != 0xff)
+    while (trigger_val != 0xff)
     {
         read(serial_port, &trigger_val, 1);
     }
@@ -533,41 +532,45 @@ void mbot::read_mac_address(uint8_t* mac_address, uint16_t* pkt_len) {
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }
 
-void mbot::read_message(uint8_t* msg_data_serialized, uint16_t message_len, char* topic_msg_data_checksum) {
+void mbot::read_message(uint8_t *msg_data_serialized, uint16_t message_len, char *topic_msg_data_checksum)
+{
     read(serial_port, msg_data_serialized, message_len);
     read(serial_port, topic_msg_data_checksum, 1);
 }
 
-int mbot::validate_message(uint8_t* msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum) {
-    uint8_t cs_topic_msg_data = checksum(msg_data_serialized, message_len); 
+int mbot::validate_message(uint8_t *msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum)
+{
+    uint8_t cs_topic_msg_data = checksum(msg_data_serialized, message_len);
     int valid_message = (cs_topic_msg_data == topic_msg_data_checksum);
     return valid_message;
 }
 
-void mbot::encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len) {
+void mbot::encode_msg(uint8_t *msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t *msg_ser, int msg_ser_len)
+{
     // check to make sure lengths align
-    if (MAC_ADDR_LEN + 3 + msg_len + ROS_PKG_LEN != msg_ser_len) {
+    if (MAC_ADDR_LEN + 3 + msg_len + ROS_PKG_LEN != msg_ser_len)
+    {
         printf("Error: The length of the serialized message array does not match the length of the message array plus packaging.\n");
         return;
     }
 
     // add mac address
     msg_ser[0] = SYNC_FLAG;
-    msg_ser[1] = (uint8_t) ((msg_len + ROS_PKG_LEN) % 255);
-    msg_ser[2] = (uint8_t) ((msg_len + ROS_PKG_LEN) >> 8);
+    msg_ser[1] = (uint8_t)((msg_len + ROS_PKG_LEN) % 255);
+    msg_ser[2] = (uint8_t)((msg_len + ROS_PKG_LEN) >> 8);
     memcpy(msg_ser + 3, mac_address, MAC_ADDR_LEN);
 
     // add ROS packet header
     msg_ser[9] = SYNC_FLAG;
     msg_ser[10] = VERSION_FLAG;
-    msg_ser[11] = (uint8_t) (msg_len % 255);
-    msg_ser[12] = (uint8_t) (msg_len >> 8);
+    msg_ser[11] = (uint8_t)(msg_len % 255);
+    msg_ser[12] = (uint8_t)(msg_len >> 8);
     uint8_t cs1_addends[2] = {msg_ser[11], msg_ser[12]};
     msg_ser[13] = checksum(cs1_addends, 2);
 
     // add topic and message
-    msg_ser[14] = (uint8_t) (topic % 255);
-    msg_ser[15] = (uint8_t) (topic >> 8);
+    msg_ser[14] = (uint8_t)(topic % 255);
+    msg_ser[15] = (uint8_t)(topic >> 8);
     memcpy(msg_ser + 16, msg, msg_len);
     uint8_t cs2_addends[msg_len + 2];
     cs2_addends[0] = msg_ser[14];
@@ -576,34 +579,23 @@ void mbot::encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_add
     msg_ser[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
 }
 
+static uint64_t get_time_millis()
+{
+    auto currentTimePoint = std::chrono::high_resolution_clock::now();
+    auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint);
+    return (uint64_t)microsecondsSinceEpoch.time_since_epoch().count();
+}
+
 // Reads all incoming data on USB
 void mbot::recv_th()
 {
     // Check if user defined port
     if (port.empty())
     {
-        DIR *dir;
-        struct dirent *ent;
-        if ((dir = opendir("/dev")) != NULL)
-        {
-            // print all the files and directories within directory
-            while ((ent = readdir(dir)) != NULL)
-            {
-                if (strstr(ent->d_name, "usb") != NULL)
-                {
-                    port = "/dev/";
-                    port += ent->d_name;
-                    break;
-                }
-            }
-            closedir(dir);
-        }
-        else
-        {
-            // could not open directory
-            perror("Could not open /dev directory");
-            return;
-        }
+        // TODO: Find the port that the host is connected to
+        // But for now print an error
+        perror("Error: No port specified.\n");
+        return;
     }
 
     // open com port host is connected to
@@ -640,14 +632,14 @@ void mbot::recv_th()
         perror("Error from tcsetattr");
         return;
     }
+    
+    // Set start time for timesync offset
+    mbot::start_time = get_time_millis()
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
     while (running.get())
     {
-        char buffer[256];
-        // Read data from the device, should get ACK
-
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
