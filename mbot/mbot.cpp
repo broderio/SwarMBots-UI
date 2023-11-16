@@ -279,11 +279,9 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     delete[] msg_serialized;
 
     // add to the send queue
-    std::cout << "Adding packet to send queue\n";
     this->send_mutex.lock();
     this->send_queue.push(packet);
     this->send_mutex.unlock();
-    std::cout << "Packet enqueued\n";
 
     // alert the send thread there is work to do
     this->send_cv.notify_one();
@@ -675,31 +673,15 @@ void mbot::send_th()
             {
                 send_cv.wait(queue_lock);
             }
-            std::cout << "Received packet, queue size =" << send_queue.size() << std::endl;
             packet = send_queue.front();
-            std::cout << "Popping packet\n";
             send_queue.pop();
-            std::cout << "Popped packet from queue\n";
         }
         
-        std::cout << "Writing to serial port\n";
         ssize_t bytes_written = write(serial_port, packet.data, packet.length);
         if (bytes_written < 0)
         {
             perror("Error writing to serial port");
             continue;
-        }
-        printf("Sent %ld bytes\n", bytes_written);
-        char buffer[256];
-        // Read data from the device, should get ACK
-        if (bytes_written == 25)
-        {
-            int bytes_read = read(serial_port, buffer, sizeof(buffer));
-            if (bytes_read > 0)
-            {
-                buffer[bytes_read] = '\0';
-                printf("Received: %s", buffer);
-            }
         }
     }
 }
