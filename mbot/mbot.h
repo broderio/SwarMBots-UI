@@ -21,7 +21,7 @@ class mbot
 {
 public:
     mbot();
-    mbot(const std::string &, const std::string &, const mbot_params_t &);
+    mbot(const std::string &, const std::string &);
     ~mbot();
     mbot(const mbot &);
 

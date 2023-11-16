@@ -108,10 +108,9 @@ std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
-mbot::mbot(const std::string &name, const std::string &mac_address, const mbot_params_t &params)
+mbot::mbot(const std::string &name, const std::string &mac_address)
 {
     this->name = name;
-    this->params = params;
     this->is_alive = true;
     string_to_mac(mac_address, this->mac_address);
 
@@ -168,7 +167,6 @@ mbot::mbot(const mbot &other)
     // Copy basic parameters
     this->name = other.name;
     std::memcpy(this->mac_address, other.mac_address, MAC_ADDR_LEN);
-    this->params = other.params;
     this->is_alive = other.is_alive;
 
     // Update map with new pointer (not sure if this would be expected behavior?)
@@ -199,11 +197,10 @@ std::vector<mbot> mbot::init_from_file(const std::string &filename)
     // Create the mbots
     std::vector<mbot> mbots;
     mbots.reserve(num_bots);
-    mbot_params_t params;
     for (int i = 0; i < num_bots; i++)
     {
         std::string name = "mbot" + std::to_string(i);
-        mbots.emplace_back(name, macs[i], params);
+        mbots.emplace_back(name, macs[i]);
     }
 
     return mbots;
