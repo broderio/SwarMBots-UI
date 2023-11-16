@@ -190,6 +190,7 @@ std::vector<mbot> mbot::init_from_file(const std::string &filename)
     std::vector<std::string> macs;
     while (std::getline(file, line))
     {
+        if (line[0] == '#') continue;
         macs.push_back(line);
         num_bots++;
     }
