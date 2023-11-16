@@ -190,7 +190,8 @@ std::vector<mbot> mbot::init_from_file(const std::string &filename)
     std::vector<std::string> macs;
     while (std::getline(file, line))
     {
-        if (line[0] == '#') continue;
+        if (line[0] == '#')
+            continue;
         macs.push_back(line);
         num_bots++;
     }
@@ -538,16 +539,20 @@ void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }
 
-void mbot::read_message(uint8_t *msg_data_serialized, uint16_t message_len, char *topic_msg_data_checksum)
+void mbot::read_message(uint8_t *data_serialized, uint16_t message_len, uint8_t *data_checksum)
 {
-    read(serial_port, msg_data_serialized, message_len);
-    read(serial_port, topic_msg_data_checksum, 1);
+    size_t bytes_read = 0;
+    while (bytes_read < message_len)
+    {
+        bytes_read += read(serial_port, data_serialized + bytes_read, message_len - bytes_read);
+    }
+    read(serial_port, data_checksum, 1);
 }
 
-int mbot::validate_message(uint8_t *msg_data_serialized, uint16_t message_len, char topic_msg_data_checksum)
+int mbot::validate_message(uint8_t *data_serialized, uint16_t message_len, uint8_t data_checksum)
 {
-    uint8_t cs_topic_msg_data = checksum(msg_data_serialized, message_len);
-    int valid_message = (cs_topic_msg_data == topic_msg_data_checksum);
+    uint8_t cs_data = checksum(data_serialized, message_len);
+    int valid_message = (cs_data == data_checksum);
     return valid_message;
 }
 
@@ -641,18 +646,49 @@ void mbot::recv_th()
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
+
+    // Debug
+    // int num_invalid_packets = 0;
+    // int num_valid_packets = 0;
+    // auto start_t = std::chrono::high_resolution_clock::now();
+    // std::unordered_map<std::string, int> valid_packets_per_mac;
     while (running.get())
-    {
+    {   
+        // Debug
+        // auto current_time = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double> elapsed = current_time - start_t;
+        // if (elapsed.count() >= 1.0) { // every second
+        //     double total_packets = num_invalid_packets + num_valid_packets;
+        //     std::cout << "Packets per second: " << total_packets / elapsed.count() << ", Validity ratio: " << (double)num_valid_packets / total_packets << "\n";
+        //     for (const auto& pair : valid_packets_per_mac) {
+        //         std::cout << "MAC: " << pair.first << ", Valid packets: " << pair.second << "\n";
+        //     }
+        //     num_valid_packets = 0; // reset the count
+        //     num_invalid_packets = 0; // reset the count
+        //     start_t = current_time; // reset the start time
+        // }
+        
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
         read_mac_address(mac_address, &pkt_len);
+        if (pkt_len != 204) continue;
 
         uint8_t msg_data_serialized[pkt_len];
-        char topic_msg_data_checksum = 0;
-        read_message(msg_data_serialized, pkt_len, &topic_msg_data_checksum);
-        if (!validate_message(msg_data_serialized, pkt_len, topic_msg_data_checksum))
+        uint8_t data_checksum = 0;
+        read_message(msg_data_serialized, pkt_len, &data_checksum);
+
+        if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
+        {
+            // num_invalid_packets++;
             continue;
+        }
+
+        // Debug
+        // if (valid_packets_per_mac.find(mac_to_string(mac_address)) == valid_packets_per_mac.end())
+        //     valid_packets_per_mac[mac_to_string(mac_address)] = 0;
+        // valid_packets_per_mac[mac_to_string(mac_address)]++;
+        // num_valid_packets++;
 
         std::string mac_str = mac_to_string(mac_address);
         if (mbots.find(mac_str) == mbots.end())
@@ -677,7 +713,7 @@ void mbot::send_th()
             packet = send_queue.front();
             send_queue.pop();
         }
-        
+
         ssize_t bytes_written = write(serial_port, packet.data, packet.length);
         if (bytes_written < 0)
         {
