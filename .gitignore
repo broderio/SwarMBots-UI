@@ -1,0 +1,6 @@
+.vscode/**
+build/**
+Debug/**
+bin/**
+macs.txt
+.DS_store
