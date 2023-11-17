@@ -93,6 +93,7 @@ std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
+mbot::thread_safe_t<bool> mbot::verbose;
 
 // Default constructor for mbot class
 mbot::mbot()
@@ -118,6 +119,7 @@ mbot::mbot(const std::string &name, const mac_address_t mac_address, const std::
     // Start the thread
     if (!running.get())
     {
+        verbose.set(false);
         //TODO: read the txt file containing the mac addresses of the clients and initialize map
         port_name = port_in;
         running.set(true);
@@ -186,6 +188,7 @@ serial_mbot_motor_vel_t mbot::get_motor_vel_goal()
 
 void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 {
+    if (!is_alive) return;
     this->robot_vel_goal.vx = vx;
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
@@ -213,6 +216,7 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 
 void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
 {
+    if (!is_alive) return;
     // TODO: make sure I'm doing this right
     this->motor_vel_goal.velocity[0] = a;
     this->motor_vel_goal.velocity[1] = b;
@@ -246,6 +250,7 @@ serial_mbot_motor_pwm_t mbot::get_motor_pwm()
 
 void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 {
+    if (!is_alive) return;
     serial_mbot_motor_pwm_t mbot_pwm;
     mbot_pwm.pwm[0] = a;
     mbot_pwm.pwm[1] = b;
@@ -285,6 +290,7 @@ serial_mbot_encoders_t mbot::get_encoders()
 
 void mbot::set_odom(float x, float y, float theta)
 {
+    if (!is_alive) return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = x;
     mbot_odom.y = y;
@@ -314,6 +320,7 @@ void mbot::set_odom(float x, float y, float theta)
 
 void mbot::reset_odom()
 {
+    if (!is_alive) return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = 0;
     mbot_odom.y = 0;
@@ -343,6 +350,7 @@ void mbot::reset_odom()
 
 void mbot::set_encoders(int a, int b, int c = 0)
 {
+    if (!is_alive) return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = a;
     mbot_encoders.ticks[1] = b;
@@ -372,6 +380,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
 
 void mbot::reset_encoders()
 {
+    if (!is_alive) return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = 0;
     mbot_encoders.ticks[1] = 0;
@@ -400,6 +409,7 @@ void mbot::reset_encoders()
 }
 
 void mbot::send_timesync(){
+    if (!is_alive) return;
     serial_timestamp_t timestamp;
     auto currentTimePoint = std::chrono::high_resolution_clock::now();
     
@@ -429,6 +439,10 @@ void mbot::send_timesync(){
 
     // alert the send thread there is work to do
     send_cv.notify_one();
+}
+
+void mbot::set_verbose(){
+    verbose.set(true);
 }
 
 void mbot::update_mbot(message_topics topic, uint8_t *data)
@@ -502,7 +516,21 @@ void mbot::recv_th()
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
-        read_mac_address(serial_port, mac_address, &pkt_len);
+        uint8_t trigger_val = 0x00;
+        while (read(serial_port, &trigger_val, 1) == 0);
+        if (trigger_val == 0xff) read_mac_address(serial_port, mac_address, &pkt_len);
+        else if (verbose.get()){
+            uint8_t count = 1;
+            buffer[0] = char(trigger_val);
+            while(char(trigger_val) != '\n'){
+                if (read(serial_port, &trigger_val, 1) == 0) continue;
+                buffer[count] = char(trigger_val);
+                ++count;
+            }
+            buffer[count] = '\n';
+            buffer[count + 1] = '\0';
+            printf("%s", buffer);
+        }
 
         uint8_t header_data[ROS_HEADER_LEN];
         read_header(serial_port, header_data);

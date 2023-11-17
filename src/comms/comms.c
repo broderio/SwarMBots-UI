@@ -10,11 +10,6 @@ uint8_t checksum(uint8_t* addends, int len) {
 }
 
 void read_mac_address(int serial_port, uint8_t* mac_address, uint16_t* pkt_len) {
-    uint8_t trigger_val = 0x00;
-    while(trigger_val != 0xff)
-    {
-        read(serial_port, &trigger_val, 1);
-    }
     read(serial_port, pkt_len, 2);
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }

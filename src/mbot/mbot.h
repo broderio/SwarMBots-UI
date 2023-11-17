@@ -50,7 +50,7 @@ public:
     mac_address_t mac_address;
     const std::string mac_str;
     std::string name;
-    int is_alive;
+    bool is_alive;
 
 private:
     // Thread safe class
@@ -97,6 +97,9 @@ private:
     void update_mbot(message_topics topic, uint8_t *data);
 
     // Static variables and functions for robot_thread()
+    static thread_safe_t<bool> verbose;
+    static void set_verbose();
+    
     static std::string mac_to_string(const mac_address_t mac_address); // converts mac_address_t to std::string
     static std::unordered_map<std::string, mbot *> mbots;       // contains pointers to all instatiated mbot objects
 
