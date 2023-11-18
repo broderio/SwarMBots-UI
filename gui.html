@@ -5,20 +5,66 @@
 </head>
 <body>
 
-<!-- Include the PixiJS library -->
+<style>
+    body,html {
+        margin: 0px;
+        padding: 0px;
+    }
+    #controls {
+        float:right;
+        background-color: #999;
+    }
+    #container {
+        display: flex;
+        justify-content: space-between;
+    }
+    #pixi-container {
+        width: 60%; /* Adjust as needed */
+    }
+    #messages {
+        width: 40%; /* Adjust as needed */
+        align-self: flex-start;
+    }
+</style>
+
+<div id="controls">
+    <div id="server">
+    <input type="text" name="server_url" id="server_url" value="ws://localhost:9002" /><br />
+    <button id="toggle_connect" onclick="toggle_connect();">Connect</button>
+    </div>
+</div>
+<div id="container"> 
+    <div id="pixi-container"></div>
+    <div id="messages"></div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.10/pixi.min.js"></script>
-
-<!-- Add this where you want the arrow to be displayed -->
-<div id="pixiContainer"></div>
-
 <script type="text/javascript">
+
 var ws;
 var url;
+var mbots = {};
 
-var mbot;
+var color_idx = 0;
+var colors = {
+    "red": 0xFF0000,
+    "green": 0x00FF00,
+    "blue": 0x0000FF,
+    "yellow": 0xFFFF00,
+    "magenta": 0xFF00FF,
+    "cyan": 0x00FFFF
+};
 
-var app = new PIXI.Application({ width: 500, height: 500, backgroundColor: 0xFFFFFF });
-document.getElementById("pixiContainer").appendChild(app.view);
+// Define size variables for the canvas
+var dim = 500;
+var pixels_per_meter = 100;
+var grid_offset = 5;
+var lines_per_meter = 2;
+var center = dim / 2;
+
+var actual_dim = dim + 2 * grid_offset;
+var app = new PIXI.Application({ width: actual_dim, height: actual_dim, backgroundColor: 0xFFFFFF });
+document.getElementById("pixi-container").appendChild(app.view);
 
 function connect() {
 	url = document.getElementById("server_url").value;
@@ -36,6 +82,20 @@ function connect() {
 		
 		document.getElementById("server_url").disabled = true;
 		document.getElementById("toggle_connect").innerHTML = "Disconnect";
+
+        // Draw a grid
+        var grid = new PIXI.Graphics();
+        grid.lineStyle(1, 0x000000, 1);
+        
+        var num_lines = dim / pixels_per_meter * lines_per_meter;
+        var pixels_per_line = dim / num_lines;
+        for (var i = 0; i < num_lines; i++) {
+            grid.moveTo(grid_offset, pixels_per_line*i + grid_offset);
+            grid.lineTo(dim + grid_offset, pixels_per_line*i + grid_offset);
+            grid.moveTo(pixels_per_line*i + grid_offset, grid_offset);
+            grid.lineTo(pixels_per_line*i + grid_offset, dim + grid_offset);
+        }
+        app.stage.addChild(grid);
 	};
 	
 	ws.onerror = function(e) {
@@ -47,47 +107,112 @@ function connect() {
 		document.getElementById("messages").innerHTML = "Client: The connection to "+url+" was closed. ["+e.code+(e.reason != "" ? ","+e.reason : "")+"]<br />";
 	    cleanup_disconnect();
 	};
+
+    function format_output(key, value) {
+        if (typeof value === 'object' && value !== null) {
+            var result = {};
+            Object.keys(value).forEach(function(key) {
+                result[key] = value[key];
+            });
+            return result;
+        }
+        return value;
+    };
 	
 	ws.onmessage = function(e) {
         mbot = JSON.parse(e.data);
-        document.getElementById("messages").innerHTML = "Client: Message received: "+e.data+"<br />";
-        updateArrow(mbot);
+        var msg = JSON.stringify(mbot, format_output, '\t');
+        msg = msg.replace(/,|{|}|"|:/g, function(match) {
+            if (match === ',') return '\n';
+            if (match === ':') return ':\t';
+            return '';
+        });
+        document.getElementById("messages").innerHTML = "<pre>"+msg+"</pre><br />";
+        if (!(mbot.mac in mbots)) {
+            addMbot(mbot);
+        }
+        else {
+            updateMbot(mbot);
+        }
 	};
 
-    function updateArrow(mbot) {
-       // Calculate the position of the circle
-        var x = 250 + mbot.x * 100;
-        var y = 250 - mbot.y * 100;
-        var theta;
+    function transformMbotCoords(mbot) {
+        out = {};
+        out.x = center + grid_offset + mbot.x * pixels_per_meter;
+        out.y = center + grid_offset - mbot.y * pixels_per_meter;
         if (mbot.theta >= 0) {
-            theta = Math.PI - mbot.theta;
+            out.theta = 2 * Math.PI - mbot.theta;
         } else {
-            theta = -Math.PI - mbot.theta;
+            out.theta = -mbot.theta;
         }
+        return out;
+    }
 
-        var radius = 10; // Adjust as needed
-
-        // Clear the previous circle
-        app.stage.removeChildren();
-
-        // Draw a new circle
+    function addMbot(mbot) {
+        var rad = 10;
+        var dotRad = 3;
         var circle = new PIXI.Graphics();
-        circle.beginFill(0x000000);
-        circle.drawCircle(x, y, radius);
+        circle.beginFill(colors["black"]);
+        mbot_pixels = transformMbotCoords(mbot);
+        circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
         circle.endFill();
         app.stage.addChild(circle);
 
-        var dotRadius = 5; // Adjust as needed
-        var dotX = x + radius * Math.cos(theta + Math.PI);
-        var dotY = y + radius * Math.sin(theta + Math.PI);
-
-        // Draw a new red dot
+        var color = Object.keys(colors)[color_idx];
+        color_idx = color_idx + 1 % Object.keys(colors).length;
+        var dotX = mbot_pixels.x + dotRad * Math.cos(mbot_pixels.theta);
+        var dotY = mbot_pixels.y + dotRad * Math.sin(mbot_pixels.theta);
         var dot = new PIXI.Graphics();
-        dot.beginFill(0xFF0000);
-        dot.drawCircle(dotX, dotY, dotRadius);
+        dot.beginFill(colors[color]);
+        dot.drawCircle(dotX, dotY, dotRad);
         dot.endFill();
         app.stage.addChild(dot);
+        
+        var trail = [];
+        mbots[mbot.mac] = {circle, dot, color, trail};
     }
+
+    function updateMbot(mbot) {
+        var circle;
+        var dot;
+        var color;
+        ({circle, dot, color, trail} = mbots[mbot.mac]);
+        mbot_pixels = transformMbotCoords(mbot);
+        
+        var rad = 10;
+        var dotRad = 5;
+
+        circle.clear();
+        dot.clear();
+
+        circle.beginFill(colors["black"]);
+        circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
+        circle.endFill();
+
+        var dotX = mbot_pixels.x + dotRad * Math.cos(mbot_pixels.theta);
+        var dotY = mbot_pixels.y + dotRad * Math.sin(mbot_pixels.theta);
+        dot.beginFill(colors[color]);
+        dot.drawCircle(dotX, dotY, dotRad);
+        dot.endFill();
+
+        // Add the current position to the trail
+        trail.push({x: mbot_pixels.x, y: mbot_pixels.y});
+
+        // If the trail is too long, remove the oldest position
+        if (trail.length > 50) { // Change this to the desired length of the trail
+            trail.shift();
+        }
+
+        // Draw the trail
+        for (var i = 1; i < trail.length; i++) {
+            circle.lineStyle(2, colors[color], 1);
+            circle.moveTo(trail[i-1].x, trail[i-1].y);
+            circle.lineTo(trail[i].x, trail[i].y);
+        }
+
+        mbots[mbot.mac] = {circle, dot, color, trail};
+    }
+
 }
 
 function disconnect() {
@@ -108,26 +233,6 @@ function toggle_connect() {
 	}
 }
 </script>
-
-<style>
-body,html {
-	margin: 0px;
-	padding: 0px;
-}
-#controls {
-	float:right;
-	background-color: #999;
-}
-
-</style>
-
-<div id="controls">
-	<div id="server">
-	<input type="text" name="server_url" id="server_url" value="ws://localhost:9002" /><br />
-	<button id="toggle_connect" onclick="toggle_connect();">Connect</button>
-	</div>
-</div>
-<div id="messages"></div>
 
 </body>
 </html>

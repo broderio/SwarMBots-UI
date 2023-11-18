@@ -603,11 +603,12 @@ uint64_t mbot::get_time_millis()
     return (uint64_t)microsecondsSinceEpoch.time_since_epoch().count();
 }
 
-std::string mbot::jsonify_packets_wrapper(mbot::packets_wrapper_t *packets_wrapper)
+std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packets_wrapper_t *packets_wrapper)
 {
     std::ostringstream oss;
 
     oss << "{"
+        << "\"mac\":" << mac_to_string(mac_address) << ","
         << "\"x\":" << packets_wrapper->odom.x<< ","
         << "\"y\":" << packets_wrapper->odom.y << ","
         << "\"theta\":" << packets_wrapper->odom.theta << ","
@@ -727,7 +728,7 @@ void mbot::recv_th()
 
         if (server_running.get())
         {
-            server.send_data(jsonify_packets_wrapper(pkt_wrapped));
+            server.send_data(jsonify_packets_wrapper(mac_address, pkt_wrapped));
         }
     }
 }

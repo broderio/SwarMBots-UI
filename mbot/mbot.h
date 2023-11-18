@@ -93,7 +93,7 @@ private:
         serial_mbot_motor_vel_t motor_vel;
         serial_mbot_motor_pwm_t motor_pwm;
     };
-    static std::string jsonify_packets_wrapper(packets_wrapper_t *packets_wrapper);
+    static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
 
 
     thread_safe_t<serial_twist2D_t> robot_vel;

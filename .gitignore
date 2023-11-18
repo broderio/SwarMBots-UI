@@ -1,6 +1,5 @@
 .vscode/**
 build/**
-Debug/**
-bin/**
+debug/**
 macs.txt
 .DS_store
