@@ -120,7 +120,11 @@ function connect() {
     };
 	
 	ws.onmessage = function(e) {
+        try {
         mbot = JSON.parse(e.data);
+        } catch (error) {
+            console.error("Error parsing JSON:", e.data, error);
+        }
         var msg = JSON.stringify(mbot, format_output, '\t');
         msg = msg.replace(/,|{|}|"|:/g, function(match) {
             if (match === ',') return '\n';

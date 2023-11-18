@@ -16,7 +16,7 @@ vcpkg install websocketpp
 This project uses `cmake` for building and compiling. Follow the steps below to compile:
 
 ```bash
-cmake -B build/ -S . -DCMAKE_TOOLCHAIN_FILE=[DIRECTORY/vcpkg/]/scripts/buildsystems/vcpkg.cmake
+cmake -B build/ -S . -DCMAKE_TOOLCHAIN_FILE=[DIRECTORY]/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build build/
 ```
 

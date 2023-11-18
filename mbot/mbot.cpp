@@ -608,7 +608,7 @@ std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packe
     std::ostringstream oss;
 
     oss << "{"
-        << "\"mac\":" << mac_to_string(mac_address) << ","
+        << "\"mac\":\"" << mac_to_string(mac_address) << "\","
         << "\"x\":" << packets_wrapper->odom.x<< ","
         << "\"y\":" << packets_wrapper->odom.y << ","
         << "\"theta\":" << packets_wrapper->odom.theta << ","
