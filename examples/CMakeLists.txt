@@ -1,0 +1,5 @@
+add_subdirectory(drive_triangle)
+add_subdirectory(spin_in_place)
+add_subdirectory(print_speed)
+add_subdirectory(debug_threads)
+add_subdirectory(p_controller)

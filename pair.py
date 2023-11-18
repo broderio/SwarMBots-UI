@@ -1,19 +1,24 @@
 import serial
 import re
-import sys
+import argparse
 
 def main():
-    if (len(sys.argv) != 2):
-        print("Usage: python3 pair.py <serial port>")
-        exit(1)
+    parser = argparse.ArgumentParser(description="Read MAC addresses from a serial port.")
+    parser.add_argument("port", help="The serial port to read from.")
+    parser.add_argument("-c", "--clean", action="store_true", help="Overwrite the macs.txt file with new MAC addresses.")
+    args = parser.parse_args()
 
-    port_name = sys.argv[1]
-    ser = serial.Serial(port_name, 115200)
-
-    macs = open('macs.txt', 'a')
+    port_name = args.port
+    ser = serial.Serial(port_name, 921600)
+    
+    file_mode = 'w' if args.clean else 'a'
+    macs = open('macs.txt', file_mode)
 
     while True:
-        line = ser.readline().decode('utf-8')
+        try:
+            line = ser.readline().decode('utf-8')
+        except UnicodeDecodeError:
+            continue
         
         mac_address_pattern = r"([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})"
         m = re.search(mac_address_pattern, line)

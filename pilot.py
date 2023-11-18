@@ -1,7 +1,7 @@
 import serial
-import sys
 import time
 import struct
+import argparse
 
 SYNC_FLAG = 0xff # beginning of packet sync flag
 VERSION_FLAG = 0xfe # version flag compatible with ROS2
@@ -30,29 +30,43 @@ def create_pkt(mac: str) -> bytes:
     return msg
 
 def main():
-    if (len(sys.argv) != 2):
-        print("Usage: python3 pilot.py <serial port>")
-        exit(1)
+    # Parse input arguments
+    parser = argparse.ArgumentParser(description="Pilot program.")
+    parser.add_argument("port", help="The serial port to use.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print all available serial output.")
+    args = parser.parse_args()
 
-    port_name = sys.argv[1]
+    # Define and open serial port
+    port_name = args.port
     ser = serial.Serial(port_name, 921600)
 
+    # Read MAC addresses from file
     macs = open('macs.txt', 'r')
     mac_list = macs.readlines()
     macs.close()
     
     # Read all available output from serial and print it
-    while ser.in_waiting:
-        print(ser.readline().decode('utf-8'))
-    print("\n\n")
+    if args.verbose:
+        while ser.in_waiting:
+            print(ser.readline().decode('utf-8'))
+        print("\n\n")
 
+    # Send packets to each MAC address
     for mac in mac_list:
         pkt = create_pkt(mac)
         print(f"Sending {len(pkt)} bytes to {mac}")
         ser.write(pkt)
+        
         time.sleep(0.1)
-        while ser.in_waiting:
-            print(ser.readline().decode('utf-8'))
+        
+        # Print terminal output
+        if args.verbose:
+            while ser.in_waiting:
+                try:
+                    line = ser.readline().decode('utf-8')
+                    print(line)
+                except UnicodeDecodeError:
+                    continue
         
 if __name__ == "__main__":
     main()
