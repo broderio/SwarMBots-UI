@@ -14,6 +14,7 @@
 #include "msgtypes.h"
 #include "mbot_params.h"
 #include "comms.h"
+#include "telemetry_server.h"
 
 using mac_address_t = uint8_t[MAC_ADDR_LEN];
 
@@ -45,6 +46,8 @@ public:
     void set_encoders(int a, int b, int c);
     void reset_encoders();
     void send_timesync();
+
+    static void start_server();
 
     drive_mode_t drive_mode;
     mbot_params_t params;
@@ -90,6 +93,8 @@ private:
         serial_mbot_motor_vel_t motor_vel;
         serial_mbot_motor_pwm_t motor_pwm;
     };
+    static std::string jsonify_packets_wrapper(packets_wrapper_t *packets_wrapper);
+
 
     thread_safe_t<serial_twist2D_t> robot_vel;
     thread_safe_t<serial_mbot_imu_t> imu;
@@ -103,7 +108,7 @@ private:
     // Mutex for USB
     std::mutex usb_mtx;
 
-    void update_mbot(uint8_t *data);
+    void update_mbot(packets_wrapper_t *pkt);
 
     static std::string mac_to_string(const mac_address_t mac_address);                // converts mac_address_t to std::string
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
@@ -112,7 +117,7 @@ private:
     static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
 
     static thread_safe_t<bool> running; // set true on the first instatiated mbot object
-    static void recv_th();              // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
+    static void recv_th();              // updates all instatiated mbot objects
     static std::thread mbot_th_handle;
     static int serial_port;
 
@@ -132,6 +137,11 @@ private:
     // Other functions and members
     static thread_safe_t<uint64_t> start_time;
     static uint64_t get_time_millis();
+
+    // Server functions and members
+    static telemetry_server server;
+    static thread_safe_t<bool> server_running;
+    static std::thread server_th_handle;
 };
 
 #endif

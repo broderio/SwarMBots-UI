@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+<title>WebSocket++ Telemetry Client</title>
+</head>
+<body>
+
+<!-- Include the PixiJS library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.10/pixi.min.js"></script>
+
+<!-- Add this where you want the arrow to be displayed -->
+<div id="pixiContainer"></div>
+
+<script type="text/javascript">
+var ws;
+var url;
+
+var mbot;
+
+var app = new PIXI.Application({ width: 500, height: 500, backgroundColor: 0xFFFFFF });
+document.getElementById("pixiContainer").appendChild(app.view);
+
+function connect() {
+	url = document.getElementById("server_url").value;
+	
+	if ("WebSocket" in window) {
+		ws = new WebSocket(url);
+	} else if ("MozWebSocket" in window) {
+		ws = new MozWebSocket(url);
+	} else {
+		document.getElementById("messages").innerHTML = "This Browser does not support WebSockets<br />";
+		return;
+	}
+	ws.onopen = function(e) {
+		document.getElementById("messages").innerHTML = "Client: A connection to "+ws.url+" has been opened.<br />";
+		
+		document.getElementById("server_url").disabled = true;
+		document.getElementById("toggle_connect").innerHTML = "Disconnect";
+	};
+	
+	ws.onerror = function(e) {
+		document.getElementById("messages").innerHTML = "Client: An error occured, see console log for more details.<br />";
+		console.log(e);
+	};
+	
+	ws.onclose = function(e) {
+		document.getElementById("messages").innerHTML = "Client: The connection to "+url+" was closed. ["+e.code+(e.reason != "" ? ","+e.reason : "")+"]<br />";
+	    cleanup_disconnect();
+	};
+	
+	ws.onmessage = function(e) {
+        mbot = JSON.parse(e.data);
+        document.getElementById("messages").innerHTML = "Client: Message received: "+e.data+"<br />";
+        updateArrow(mbot);
+	};
+
+    function updateArrow(mbot) {
+       // Calculate the position of the circle
+        var x = 250 + mbot.x * 100;
+        var y = 250 - mbot.y * 100;
+        var theta;
+        if (mbot.theta >= 0) {
+            theta = Math.PI - mbot.theta;
+        } else {
+            theta = -Math.PI - mbot.theta;
+        }
+
+        var radius = 10; // Adjust as needed
+
+        // Clear the previous circle
+        app.stage.removeChildren();
+
+        // Draw a new circle
+        var circle = new PIXI.Graphics();
+        circle.beginFill(0x000000);
+        circle.drawCircle(x, y, radius);
+        circle.endFill();
+        app.stage.addChild(circle);
+
+        var dotRadius = 5; // Adjust as needed
+        var dotX = x + radius * Math.cos(theta + Math.PI);
+        var dotY = y + radius * Math.sin(theta + Math.PI);
+
+        // Draw a new red dot
+        var dot = new PIXI.Graphics();
+        dot.beginFill(0xFF0000);
+        dot.drawCircle(dotX, dotY, dotRadius);
+        dot.endFill();
+        app.stage.addChild(dot);
+    }
+}
+
+function disconnect() {
+	ws.close();
+	cleanup_disconnect();
+}
+
+function cleanup_disconnect() {
+    document.getElementById("server_url").disabled = false;
+	document.getElementById("toggle_connect").innerHTML = "Connect";
+}
+
+function toggle_connect() {
+	if (document.getElementById("server_url").disabled === false) {
+		connect();
+	} else {
+		disconnect();
+	}
+}
+</script>
+
+<style>
+body,html {
+	margin: 0px;
+	padding: 0px;
+}
+#controls {
+	float:right;
+	background-color: #999;
+}
+
+</style>
+
+<div id="controls">
+	<div id="server">
+	<input type="text" name="server_url" id="server_url" value="ws://localhost:9002" /><br />
+	<button id="toggle_connect" onclick="toggle_connect();">Connect</button>
+	</div>
+</div>
+<div id="messages"></div>
+
+</body>
+</html>

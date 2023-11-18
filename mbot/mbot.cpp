@@ -102,6 +102,10 @@ int mbot::serial_port;
 std::string mbot::port;
 mbot::thread_safe_t<uint64_t> mbot::start_time;
 
+mbot::thread_safe_t<bool> mbot::server_running(false);
+telemetry_server mbot::server;
+std::thread mbot::server_th_handle;
+
 std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
@@ -364,7 +368,6 @@ void mbot::set_odom(float x, float y, float theta)
     mbot_odom.x = x;
     mbot_odom.y = y;
     mbot_odom.theta = theta;
-    this->odom.set(mbot_odom);
 
     // Initialize variables for packet
     packet_t packet;
@@ -393,7 +396,6 @@ void mbot::reset_odom()
     mbot_odom.x = 0;
     mbot_odom.y = 0;
     mbot_odom.theta = 0;
-    this->odom.set(mbot_odom);
 
     // Initialize variables for packet
     packet_t packet;
@@ -422,7 +424,6 @@ void mbot::set_encoders(int a, int b, int c = 0)
     mbot_encoders.ticks[0] = a;
     mbot_encoders.ticks[1] = b;
     mbot_encoders.ticks[2] = c;
-    this->encoders.set(mbot_encoders);
 
     // Initialize variables for packet
     packet_t packet;
@@ -451,7 +452,6 @@ void mbot::reset_encoders()
     mbot_encoders.ticks[0] = 0;
     mbot_encoders.ticks[1] = 0;
     mbot_encoders.ticks[2] = 0;
-    this->encoders.set(mbot_encoders);
 
     // Initialize variables for packet
     packet_t packet;
@@ -501,15 +501,24 @@ void mbot::send_timesync()
     send_cv.notify_one();
 }
 
-void mbot::update_mbot(uint8_t *data)
+void mbot::start_server()
 {
-    mbot::packets_wrapper_t *packets = (mbot::packets_wrapper_t *)data;
-    this->encoders.set(packets->encoders);
-    this->odom.set(packets->odom);
-    this->imu.set(packets->imu);
-    this->robot_vel.set(packets->mbot_vel);
-    this->motor_vel.set(packets->motor_vel);
-    this->motor_pwm.set(packets->motor_pwm);
+    // TODO: Make root file an input argument
+    server_running.set(true);
+    server_th_handle = std::move(std::thread(&telemetry_server::run,
+                                             &server,
+                                             "/Users/broderio/Repositories/SwarMBots-UI",
+                                             9002));
+}
+
+void mbot::update_mbot(packets_wrapper_t *pkt)
+{
+    this->encoders.set(pkt->encoders);
+    this->odom.set(pkt->odom);
+    this->imu.set(pkt->imu);
+    this->robot_vel.set(pkt->mbot_vel);
+    this->motor_vel.set(pkt->motor_vel);
+    this->motor_pwm.set(pkt->motor_pwm);
 }
 
 // comms.h functions
@@ -594,6 +603,26 @@ uint64_t mbot::get_time_millis()
     return (uint64_t)microsecondsSinceEpoch.time_since_epoch().count();
 }
 
+std::string mbot::jsonify_packets_wrapper(mbot::packets_wrapper_t *packets_wrapper)
+{
+    std::ostringstream oss;
+
+    oss << "{"
+        << "\"x\":" << packets_wrapper->odom.x<< ","
+        << "\"y\":" << packets_wrapper->odom.y << ","
+        << "\"theta\":" << packets_wrapper->odom.theta << ","
+        << "\"vx\":" << packets_wrapper->mbot_vel.vx << ","
+        << "\"vy\":" << packets_wrapper->mbot_vel.vy << ","
+        << "\"wz\":" << packets_wrapper->mbot_vel.wz << ","
+        << "\"va\":" << packets_wrapper->motor_vel.velocity[0] << ","
+        << "\"vb\":" << packets_wrapper->motor_vel.velocity[1] << ","
+        << "\"vc\":" << packets_wrapper->motor_vel.velocity[2]
+        << "}";
+
+    // Return the JSON string
+    return oss.str();
+}
+
 // Reads all incoming data on USB
 void mbot::recv_th()
 {
@@ -650,7 +679,7 @@ void mbot::recv_th()
     // auto start_t = std::chrono::high_resolution_clock::now();
     // std::unordered_map<std::string, int> valid_packets_per_mac;
     while (running.get())
-    {   
+    {
         // Debug
         // auto current_time = std::chrono::high_resolution_clock::now();
         // std::chrono::duration<double> elapsed = current_time - start_t;
@@ -664,12 +693,13 @@ void mbot::recv_th()
         //     num_invalid_packets = 0; // reset the count
         //     start_t = current_time; // reset the start time
         // }
-        
+
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
         read_mac_address(mac_address, &pkt_len);
-        if (pkt_len != 204) continue;
+        if (pkt_len != 204)
+            continue;
 
         uint8_t msg_data_serialized[pkt_len];
         uint8_t data_checksum = 0;
@@ -692,7 +722,13 @@ void mbot::recv_th()
             continue; // continue if robot is not in swarm
         mbot *curr_mbot = mbots[mac_str];
 
-        curr_mbot->update_mbot(msg_data_serialized);
+        packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
+        curr_mbot->update_mbot(pkt_wrapped);
+
+        if (server_running.get())
+        {
+            server.send_data(jsonify_packets_wrapper(pkt_wrapped));
+        }
     }
 }
 
