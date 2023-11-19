@@ -11,17 +11,15 @@ chmod +x install.sh
 
 ## Pairing a Robot
 
-To pair a robot, use the `pair.py` script as follows:
+To pair a robot, use the `pair.py` script. Plug the client board of the MBot that you wish to pair into your laptop. Run the script and press the reset button on the client board. A MAC address should appear in the terminal if the program was executed successfully.
 
 ```bash
 python3 python/pair.py [SERIAL PORT]
 ```
 
-Follow the prompts to complete the pairing process.
-
 ## Using Pilot Mode
 
-To use pilot mode, use the `pilot.py` script as follows:
+To use pilot mode, use the `pilot.py` script. The host board must be in serial mode when the script is run. It will then send a timesync message to all robots whose MAC addresses are in `macs.txt`. You can then switch the host board to pilot mode and drive the paired MBots.
 
 ```bash
 python3 python/pilot.py [SERIAL PORT]
@@ -29,20 +27,22 @@ python3 python/pilot.py [SERIAL PORT]
 
 ## Building and Compiling Programs
 
-This project uses `cmake` for building and compiling. Use the build script to create the build directory and compile the examples.
+This project uses `cmake` for building and compiling. To compile the examples, run the following commands.
 
 ```bash
-chmod +x build.sh
-./build.sh
+mkdir build
+cd build
+cmake ..
+make
 ```
 
-After the build directory is created, if changes are made to the examples, you can recompile them with the following command:
+To save on compile time, you can specify the example you want to compile, rather than all of them.
 
 ```bash
-cmake --build build/ --target [EXAMPLE]
+make [EXAMPLE]
 ```
 
-To execute an example:
+After compilation, all of the executables are located in `build/examples/*`. To execute an example, run the following command:
 ```bash
 ./build/examples/[EXAMPLE]/[EXAMPLE]
 ```
