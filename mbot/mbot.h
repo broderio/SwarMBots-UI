@@ -23,8 +23,8 @@ class mbot
 public:
     mbot();
     mbot(const std::string &, const std::string &);
-    ~mbot();
     mbot(const mbot &);
+    ~mbot();
 
     static std::string port;
 

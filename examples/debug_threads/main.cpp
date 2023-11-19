@@ -1,14 +1,18 @@
 #include "mbot.h"
 #include <iostream>
 #include <unistd.h>
-using std::cout;
-using std::cin;
 
-// TODO: Make serial port and file path for macs.txt an input argument
-int main() {
-    mbot::port = "/dev/cu.usbserial-14210"; // This works on macOS
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+        return 1;
+    }
+    std::string port = argv[1];
+    std::string file_path = argv[2];
 
-    std::vector<mbot> mbot_list = mbot::init_from_file("/Users/broderio/Repositories/SwarMBots-UI/macs.txt");
+    mbot::port = port;
+
+    std::vector<mbot> mbot_list = mbot::init_from_file(file_path);
     std::cout << "Number of mbot objects: " << mbot_list.size() << "\n";
     while (1) {
         sleep(1);

@@ -1,35 +1,38 @@
 #include "mbot.h"
 #include <iostream>
 #include <unistd.h>
-using std::cout;
-using std::cin;
 
-// TODO: Make serial port and file path for macs.txt an input argument
-int main() {
-    mbot_params_t mbot_params;
-    mbot::port = "/dev/cu.usbserial-14110"; // This works on macOS
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+        return 1;
+    }
+    std::string port = argv[1];
+    std::string file_path = argv[2];
 
-    std::vector<mbot> mbot_list = mbot::init_from_file("/Users/broderio/Repositories/SwarMBots-UI/macs.txt");
+    mbot::port = port;
+
+    std::vector<mbot> mbot_list = mbot::init_from_file(file_path);
     while(1){
-        cout << "Turning right\n";
+        std::cout << "Turning right\n";
         for (mbot &m : mbot_list) {
             m.set_robot_vel_goal(0,0,5);
         }
         sleep(5);
 
-        cout << "Stopping\n";
+        std::cout << "Stopping\n";
         for (mbot &m : mbot_list) {
             m.set_robot_vel_goal(0,0,0);
         }
         sleep(5);
 
-        cout << "Turning left\n";
+        std::cout << "Turning left\n";
         for (mbot &m : mbot_list) {
             m.set_robot_vel_goal(0,0,-5);
         }
         sleep(5);
 
-        cout << "Stopping\n";
+        std::cout << "Stopping\n";
         for (mbot &m : mbot_list) {
             m.set_robot_vel_goal(0,0,0);
         }

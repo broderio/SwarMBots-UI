@@ -1,242 +1,323 @@
 <!doctype html>
 <html>
+
 <head>
-<title>WebSocket++ Telemetry Client</title>
+    <title>WebSocket++ Telemetry Client</title>
 </head>
+
 <body>
 
-<style>
-    body,html {
-        margin: 0px;
-        padding: 0px;
-    }
-    #controls {
-        float:right;
-        background-color: #999;
-    }
-    #container {
-        display: flex;
-        justify-content: space-between;
-    }
-    #pixi-container {
-        width: 60%; /* Adjust as needed */
-    }
-    #messages {
-        width: 40%; /* Adjust as needed */
-        align-self: flex-start;
-    }
-</style>
+    <style>
+        body,
+        html {
+            margin: 0px;
+            padding: 0px;
+        }
 
-<div id="controls">
-    <div id="server">
-    <input type="text" name="server_url" id="server_url" value="ws://localhost:9002" /><br />
-    <button id="toggle_connect" onclick="toggle_connect();">Connect</button>
+        #controls {
+            float: right;
+            background-color: #999;
+        }
+
+        #container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #pixi-container {
+            width: 60%;
+        }
+
+        #messages {
+            width: 20%;
+        }
+    </style>
+
+    <div id="controls">
+        <div id="server">
+            <input type="text" name="server_url" id="server_url" value="ws://localhost:9002" /><br />
+            <button id="toggle_connect" onclick="toggle_connect();">Connect</button>
+        </div>
     </div>
-</div>
-<div id="container"> 
-    <div id="pixi-container"></div>
-    <div id="messages"></div>
-</div>
+    <div id="container">
+        <div id="pixi-container"></div>
+        <div id="messages"></div>
+    </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.10/pixi.min.js"></script>
-<script type="text/javascript">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.10/pixi.min.js"></script>
+    <script type="text/javascript">
 
-var ws;
-var url;
-var mbots = {};
+        var ws;
+        var url;
+        var mbots = {};
 
-var color_idx = 0;
-var colors = {
-    "red": 0xFF0000,
-    "green": 0x00FF00,
-    "blue": 0x0000FF,
-    "yellow": 0xFFFF00,
-    "magenta": 0xFF00FF,
-    "cyan": 0x00FFFF
-};
+        var color_idx = 0;
+        var colors = {
+            "red": 0xFF0000,
+            "green": 0x00FF00,
+            "blue": 0x0000FF,
+            "cyan": 0x00FFFF,
+            "magenta": 0xFF00FF,
+            "yellow": 0xFFFF00,
+            "orange": 0xFFA500,
+            "purple": 0x800080,
+            "pink": 0xFFC0CB,
+            "brown": 0xA52A2A,
+            "gray": 0x808080,
+            "black": 0x000000,
+            "white": 0xFFFFFF
+        };
 
-// Define size variables for the canvas
-var dim = 500;
-var pixels_per_meter = 100;
-var grid_offset = 5;
-var lines_per_meter = 2;
-var center = dim / 2;
+        // Define size variables for the canvas
+        var dim = 600;
+        var pixels_per_meter = 200;
+        var grid_offset = 10;
+        var center = dim / 2;
+        var actual_dim = dim + 2 * grid_offset;
 
-var actual_dim = dim + 2 * grid_offset;
-var app = new PIXI.Application({ width: actual_dim, height: actual_dim, backgroundColor: 0xFFFFFF });
-document.getElementById("pixi-container").appendChild(app.view);
+        // Define grid variables
+        var major_line_width = 2;
+        var minor_line_width = 1;
+        var major_lines_per_meter = 1;
+        var minor_lines_per_meter = 4;
+        var major_line_color = colors["black"];
+        var minor_line_color = colors["gray"];
 
-function connect() {
-	url = document.getElementById("server_url").value;
-	
-	if ("WebSocket" in window) {
-		ws = new WebSocket(url);
-	} else if ("MozWebSocket" in window) {
-		ws = new MozWebSocket(url);
-	} else {
-		document.getElementById("messages").innerHTML = "This Browser does not support WebSockets<br />";
-		return;
-	}
-	ws.onopen = function(e) {
-		document.getElementById("messages").innerHTML = "Client: A connection to "+ws.url+" has been opened.<br />";
-		
-		document.getElementById("server_url").disabled = true;
-		document.getElementById("toggle_connect").innerHTML = "Disconnect";
-
-        // Draw a grid
-        var grid = new PIXI.Graphics();
-        grid.lineStyle(1, 0x000000, 1);
-        
-        var num_lines = dim / pixels_per_meter * lines_per_meter;
-        var pixels_per_line = dim / num_lines;
-        for (var i = 0; i < num_lines; i++) {
-            grid.moveTo(grid_offset, pixels_per_line*i + grid_offset);
-            grid.lineTo(dim + grid_offset, pixels_per_line*i + grid_offset);
-            grid.moveTo(pixels_per_line*i + grid_offset, grid_offset);
-            grid.lineTo(pixels_per_line*i + grid_offset, dim + grid_offset);
-        }
-        app.stage.addChild(grid);
-	};
-	
-	ws.onerror = function(e) {
-		document.getElementById("messages").innerHTML = "Client: An error occured, see console log for more details.<br />";
-		console.log(e);
-	};
-	
-	ws.onclose = function(e) {
-		document.getElementById("messages").innerHTML = "Client: The connection to "+url+" was closed. ["+e.code+(e.reason != "" ? ","+e.reason : "")+"]<br />";
-	    cleanup_disconnect();
-	};
-
-    function format_output(key, value) {
-        if (typeof value === 'object' && value !== null) {
-            var result = {};
-            Object.keys(value).forEach(function(key) {
-                result[key] = value[key];
-            });
-            return result;
-        }
-        return value;
-    };
-	
-	ws.onmessage = function(e) {
-        try {
-        mbot = JSON.parse(e.data);
-        } catch (error) {
-            console.error("Error parsing JSON:", e.data, error);
-        }
-        var msg = JSON.stringify(mbot, format_output, '\t');
-        msg = msg.replace(/,|{|}|"|:/g, function(match) {
-            if (match === ',') return '\n';
-            if (match === ':') return ':\t';
-            return '';
-        });
-        document.getElementById("messages").innerHTML = "<pre>"+msg+"</pre><br />";
-        if (!(mbot.mac in mbots)) {
-            addMbot(mbot);
-        }
-        else {
-            updateMbot(mbot);
-        }
-	};
-
-    function transformMbotCoords(mbot) {
-        out = {};
-        out.x = center + grid_offset + mbot.x * pixels_per_meter;
-        out.y = center + grid_offset - mbot.y * pixels_per_meter;
-        if (mbot.theta >= 0) {
-            out.theta = 2 * Math.PI - mbot.theta;
-        } else {
-            out.theta = -mbot.theta;
-        }
-        return out;
-    }
-
-    function addMbot(mbot) {
-        var rad = 10;
-        var dotRad = 3;
-        var circle = new PIXI.Graphics();
-        circle.beginFill(colors["black"]);
-        mbot_pixels = transformMbotCoords(mbot);
-        circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
-        circle.endFill();
-        app.stage.addChild(circle);
-
-        var color = Object.keys(colors)[color_idx];
-        color_idx = color_idx + 1 % Object.keys(colors).length;
-        var dotX = mbot_pixels.x + dotRad * Math.cos(mbot_pixels.theta);
-        var dotY = mbot_pixels.y + dotRad * Math.sin(mbot_pixels.theta);
-        var dot = new PIXI.Graphics();
-        dot.beginFill(colors[color]);
-        dot.drawCircle(dotX, dotY, dotRad);
-        dot.endFill();
-        app.stage.addChild(dot);
-        
-        var trail = [];
-        mbots[mbot.mac] = {circle, dot, color, trail};
-    }
-
-    function updateMbot(mbot) {
-        var circle;
-        var dot;
-        var color;
-        ({circle, dot, color, trail} = mbots[mbot.mac]);
-        mbot_pixels = transformMbotCoords(mbot);
-        
-        var rad = 10;
+        // Define size variables for the mbot
+        var rad = 15; // 3 inches = 7.62 cm ~ 15 pixels
         var dotRad = 5;
 
-        circle.clear();
-        dot.clear();
+        var app = new PIXI.Application({ width: actual_dim, height: actual_dim, backgroundColor: 0xFFFFFF });
+        document.getElementById("pixi-container").appendChild(app.view);
 
-        circle.beginFill(colors["black"]);
-        circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
-        circle.endFill();
+        function formatMbotData(mbot) {
+            var mbot_copy = {...mbot};
+            delete mbot_copy.mac;
+            var msg = JSON.stringify(mbot_copy, null, '\t');
+            msg = msg.replace(/,|{|}|"|:/g, function (match) {
+                if (match === ',') return "<br>";
+                if (match === ':') return ':\t';
+                return '';
+            });
+            return msg;
+        };
 
-        var dotX = mbot_pixels.x + dotRad * Math.cos(mbot_pixels.theta);
-        var dotY = mbot_pixels.y + dotRad * Math.sin(mbot_pixels.theta);
-        dot.beginFill(colors[color]);
-        dot.drawCircle(dotX, dotY, dotRad);
-        dot.endFill();
-
-        // Add the current position to the trail
-        trail.push({x: mbot_pixels.x, y: mbot_pixels.y});
-
-        // If the trail is too long, remove the oldest position
-        if (trail.length > 50) { // Change this to the desired length of the trail
-            trail.shift();
+        function intToRGB(intColor) {
+            var r = (intColor >> 16) & 255;
+            var g = (intColor >> 8) & 255;
+            var b = intColor & 255;
+            return "rgb(" + r + ", " + g + ", " + b + ")";
         }
 
-        // Draw the trail
-        for (var i = 1; i < trail.length; i++) {
+        function printMbotData() {
+            // Loop through mbots and print data
+            var msg = "";
+            for (var mbot in mbots) {
+                var underlineColor = intToRGB(colors[mbots[mbot].color]);
+                msg += "<b style='border-bottom: 2px solid " + underlineColor + ";'>" + mbot + "</b><br><br>";
+                msg += "<pre>" + mbots[mbot].msg + "</pre><br><br><br>";
+            }
+            document.getElementById("messages").innerHTML = msg;
+        }
+
+        function drawGrid() {
+            var grid = new PIXI.Graphics();
+
+            // Print minor lines
+            grid.lineStyle(minor_line_width, minor_line_color, 1);
+            var minorLines = dim / pixels_per_meter * minor_lines_per_meter;
+            var pixels_per_line = dim / minorLines;
+            for (var i = 0; i < minorLines; i++) {
+                grid.moveTo(grid_offset, pixels_per_line * i + grid_offset);
+                grid.lineTo(dim + grid_offset, pixels_per_line * i + grid_offset);
+                grid.moveTo(pixels_per_line * i + grid_offset, grid_offset);
+                grid.lineTo(pixels_per_line * i + grid_offset, dim + grid_offset);
+            }
+            
+            // Print major lines
+            grid.lineStyle(major_line_width, major_line_color, 1);
+            var majorLines = dim / pixels_per_meter * major_lines_per_meter;
+            pixels_per_line = dim / majorLines;
+            for (var i = 0; i < majorLines + 1; i++) {
+                grid.moveTo(grid_offset, pixels_per_line * i + grid_offset);
+                grid.lineTo(dim + grid_offset, pixels_per_line * i + grid_offset);
+                grid.moveTo(pixels_per_line * i + grid_offset, grid_offset);
+                grid.lineTo(pixels_per_line * i + grid_offset, dim + grid_offset);
+            }
+        
+            app.stage.addChild(grid);
+        }
+
+        function transformMbotCoords(mbot) {
+            out = {};
+            out.x = center + grid_offset + mbot.x * pixels_per_meter;
+            out.y = center + grid_offset - mbot.y * pixels_per_meter;
+            if (mbot.theta >= 0) {
+                out.theta = 2 * Math.PI - mbot.theta;
+            } else {
+                out.theta = -mbot.theta;
+            }
+            return out;
+        }
+
+        function addMbot(mbot) {
+            // Draw the mbot circle
+            var color = Object.keys(colors)[color_idx];
+            var circle = new PIXI.Graphics();
             circle.lineStyle(2, colors[color], 1);
-            circle.moveTo(trail[i-1].x, trail[i-1].y);
-            circle.lineTo(trail[i].x, trail[i].y);
+            circle.beginFill(colors["black"]);
+            mbot_pixels = transformMbotCoords(mbot);
+            circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
+            circle.endFill();
+            app.stage.addChild(circle);
+            
+            // Draw the mbot heading dot
+            color_idx = color_idx + 1 % Object.keys(colors).length;
+            var dotX = mbot_pixels.x + (rad - dotRad) * Math.cos(mbot_pixels.theta);
+            var dotY = mbot_pixels.y + (rad - dotRad) * Math.sin(mbot_pixels.theta);
+            var dot = new PIXI.Graphics();
+            dot.beginFill(colors[color]);
+            dot.drawCircle(dotX, dotY, dotRad);
+            dot.endFill();
+            app.stage.addChild(dot);
+
+            // Create mbot data string and add to messages div
+            var msg = formatMbotData(mbot);
+
+            // Create the trail array
+            var trail = [{ x: mbot_pixels.x, y: mbot_pixels.y }];
+            
+            // Add the mbot to the mbots object
+            mbots[mbot.mac] = { circle, dot, color, trail, msg };
+
+            // Add the mbot data to the messages div
+            printMbotData();
         }
 
-        mbots[mbot.mac] = {circle, dot, color, trail};
-    }
+        function updateMbot(mbot) {
+            var circle;
+            var dot;
+            var color;
+            var trail;
 
-}
+            // Get the mbot's circle, dot, color, and trail
+            ({ circle, dot, color, trail, msg } = mbots[mbot.mac]);
+            mbot_pixels = transformMbotCoords(mbot);
+            
+            // Clear the mbot's circle and dot
+            circle.clear();
+            dot.clear();
 
-function disconnect() {
-	ws.close();
-	cleanup_disconnect();
-}
+            // Update the mbot's trail
+            trail.push({ x: mbot_pixels.x, y: mbot_pixels.y });
+            if (trail.length > 50) {
+                trail.shift();
+            }
+            for (var i = 1; i < trail.length; i++) {
+                circle.lineStyle(2, colors[color], 1);
+                circle.moveTo(trail[i - 1].x, trail[i - 1].y);
+                circle.lineTo(trail[i].x, trail[i].y);
+            }
 
-function cleanup_disconnect() {
-    document.getElementById("server_url").disabled = false;
-	document.getElementById("toggle_connect").innerHTML = "Connect";
-}
+            // Draw the mbot's circle and heading dot
+            circle.beginFill(colors["black"]);
+            circle.drawCircle(mbot_pixels.x, mbot_pixels.y, rad);
+            circle.endFill();
 
-function toggle_connect() {
-	if (document.getElementById("server_url").disabled === false) {
-		connect();
-	} else {
-		disconnect();
-	}
-}
-</script>
+            var dotX = mbot_pixels.x + (rad - dotRad) * Math.cos(mbot_pixels.theta);
+            var dotY = mbot_pixels.y + (rad - dotRad) * Math.sin(mbot_pixels.theta);
+            dot.beginFill(colors[color]);
+            dot.drawCircle(dotX, dotY, dotRad);
+            dot.endFill();
+
+            // Update the mbot's data string
+            msg = formatMbotData(mbot);
+
+            // Update the mbot's data in the mbots object
+            mbots[mbot.mac] = { circle, dot, color, trail, msg };
+
+            // Update the messages div
+            printMbotData();
+        }
+
+        window.onload = function() {
+            drawGrid();
+        }
+
+        function connect() {
+            url = document.getElementById("server_url").value;
+
+            if ("WebSocket" in window) {
+                ws = new WebSocket(url);
+            } else if ("MozWebSocket" in window) {
+                ws = new MozWebSocket(url);
+            } else {
+                document.getElementById("messages").innerHTML = "This Browser does not support WebSockets<br />";
+                return;
+            }
+
+            ws.onopen = function (e) {
+                document.getElementById("messages").innerHTML = "Client: A connection to " + ws.url + " has been opened.<br />";
+
+                document.getElementById("server_url").disabled = true;
+                document.getElementById("toggle_connect").innerHTML = "Disconnect";
+            };
+
+            ws.onerror = function (e) {
+                document.getElementById("messages").innerHTML = "Client: An error occured, see console log for more details.<br />";
+                console.log(e);
+            };
+
+            ws.onclose = function (e) {
+                document.getElementById("messages").innerHTML = "Client: The connection to " + url + " was closed. [" + e.code + (e.reason != "" ? "," + e.reason : "") + "]<br />";
+                cleanup_disconnect();
+            };
+
+            ws.onmessage = function (e) {
+                mbot = JSON.parse(e.data);
+                if (!(mbot.mac in mbots)) {
+                    addMbot(mbot);
+                }
+                else {
+                    updateMbot(mbot);
+                }
+            };
+
+        }
+
+        function disconnect() {
+            ws.close();
+            cleanup_disconnect();
+        }
+
+        function cleanup_disconnect() {
+            document.getElementById("server_url").disabled = false;
+            document.getElementById("toggle_connect").innerHTML = "Connect";
+        }
+
+        function toggle_connect() {
+            if (document.getElementById("server_url").disabled === false) {
+                // Debug
+                // addMbot({ mac: "FF:DD:AA:99:22:11", x: -0.5, y: 0, theta: Math.PI / 2 });
+                // addMbot({ mac: "EE:DD:AA:99:22:11", x: 0, y: 0, theta: Math.PI / 2 });
+                // addMbot({ mac: "66:DD:AA:99:22:11", x: 0.5, y: 0, theta: Math.PI / 2 });
+                // setTimeout(function() {
+                //     updateMbot({ mac: "FF:DD:AA:99:22:11", x: -0.5, y: 1, theta: Math.PI / 2 })
+                // }, 1000);
+                // setTimeout(function() {
+                //     updateMbot({ mac: "EE:DD:AA:99:22:11", x: 0, y: 1, theta: Math.PI / 2 })
+                // }, 1000);
+                // setTimeout(function() {
+                //     updateMbot({ mac: "66:DD:AA:99:22:11", x: 0.5, y: 1, theta: Math.PI / 2 })
+                // }, 1000);
+                connect();
+            } else {
+                disconnect();
+            }
+        }
+    </script>
 
 </body>
+
 </html>
