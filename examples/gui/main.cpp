@@ -20,9 +20,9 @@ int main(int argc, char *argv[]) {
 
     // Create mbot object
     mbot m("mbot", mac_str);
+    mbot::start_server();
     
     m.reset_odom();
-    m.start_server();
 
     while (1) {
         sleep(1);

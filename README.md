@@ -2,27 +2,11 @@
 
 ## Installation
 
-This project requires the `websocketpp` package. In order to build the package, we must also install /`vcpkg`. Go to a local directory, pull the repository
+This project requires the `websocketpp` package to start the server for the GUI. Install the prerequisite packages with the install script.
 
 ```bash
-cd [DIRECTORY]
-git clone https://github.com/Microsoft/vcpkg.git
-./vcpkg/bootstrap-vcpkg.sh
-vcpkg install websocketpp
-```
-
-## Building and Compiling
-
-This project uses `cmake` for building and compiling. Follow the steps below to compile:
-
-```bash
-cmake -B build/ -S . -DCMAKE_TOOLCHAIN_FILE=[DIRECTORY]/vcpkg/scripts/buildsystems/vcpkg.cmake
-cmake --build build/
-```
-
-To execute an example:
-```bash
-./build/examples/[EXAMPLE]/[EXAMPLE]
+chmod +x install.sh
+./install.sh
 ```
 
 ## Pairing a Robot
@@ -30,7 +14,7 @@ To execute an example:
 To pair a robot, use the `pair.py` script as follows:
 
 ```bash
-python3 pair.py [SERIAL PORT]
+python3 python/pair.py [SERIAL PORT]
 ```
 
 Follow the prompts to complete the pairing process.
@@ -40,7 +24,27 @@ Follow the prompts to complete the pairing process.
 To use pilot mode, use the `pilot.py` script as follows:
 
 ```bash
-python3 pilot.py [SERIAL PORT]
+python3 python/pilot.py [SERIAL PORT]
+```
+
+## Building and Compiling Programs
+
+This project uses `cmake` for building and compiling. Use the build script to create the build directory and compile the examples.
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+After the build directory is created, if changes are made to the examples, you can recompile them with the following command:
+
+```bash
+cmake --build build/ --target [EXAMPLE]
+```
+
+To execute an example:
+```bash
+./build/examples/[EXAMPLE]/[EXAMPLE]
 ```
 
 ## Starting the GUI
@@ -53,10 +57,17 @@ This is an example program that starts the server, spins the robots for 5 second
 
 #include "mbot.h"
 
-int main() {
-    mbot::port = "serial/port/for/host"; 
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+        return 1;
+    }
+    std::string port = argv[1];
+    std::string file_path = argv[2];
+
+    mbot::port = port;
+    std::vector<mbot> mbots = mbot::init_from_file(file_path);
     mbot::start_server();
-    std::vector<mbot> mbots = mbot::init_from_file("path/to/macs.txt");
 
     sleep(5);
 

@@ -6,6 +6,8 @@
 #include <streambuf>
 #include <string>
 
+/* This class was adapted from the WebSocket++ telemetry_server example:
+https://github.com/zaphoyd/websocketpp/tree/master/examples/telemetry_server */
 
 class telemetry_server {
 public:
@@ -51,7 +53,6 @@ public:
     }
 
     void send_data(std::string data) {
-        // Broadcast count to all connections
         con_list::iterator it;
         for (it = m_connections.begin(); it != m_connections.end(); ++it) {
             m_endpoint.send(*it,data,websocketpp::frame::opcode::text);
