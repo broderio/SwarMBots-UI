@@ -714,6 +714,7 @@ void mbot::recv_th()
                 esp.append(1, char(trigger_val));
                 ++count;
             }
+            outputFile << esp;
             
             if (esp.find("ESP-ROM:") != std::string::npos)
             {
@@ -725,7 +726,6 @@ void mbot::recv_th()
                 return;
             }
 
-            outputFile << esp;
         }
 
         if (pkt_len != 204)
