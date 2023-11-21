@@ -620,13 +620,10 @@ std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packe
         << "\"theta\":" << packets_wrapper->odom.theta << ","
         << "\"vx\":" << packets_wrapper->mbot_vel.vx << ","
         // << "\"vy\":" << packets_wrapper->mbot_vel.vy << ","
-        << "\"wz\":" << packets_wrapper->mbot_vel.wz << ","
-        << "\"a\":" << packets_wrapper->encoders.ticks[0] << ","
-        << "\"b\":" << packets_wrapper->encoders.ticks[1] << ","
-        << "\"c\":" << packets_wrapper->encoders.ticks[2]
-        // << "\"va\":" << packets_wrapper->motor_vel.velocity[0] << ","
-        // << "\"vb\":" << packets_wrapper->motor_vel.velocity[1] << ","
-        // << "\"vc\":" << packets_wrapper->motor_vel.velocity[2]
+        << "\"wz\":" << packets_wrapper->mbot_vel.wz
+        // << "\"a\":" << packets_wrapper->encoders.ticks[0] << ","
+        // << "\"b\":" << packets_wrapper->encoders.ticks[1] << ","
+        // << "\"c\":" << packets_wrapper->encoders.ticks[2]
         << "}";
 
     // Return the JSON string
