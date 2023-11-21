@@ -494,7 +494,7 @@ void mbot::recv_th()
         return;
     }
 
-    tty.c_cflag = B115200; // Set your desired baud rate
+    tty.c_cflag = 921600; // Set your desired baud rate
     tty.c_cflag |= CS8;    // 8-bit data
     tty.c_cflag |= CLOCAL; // Ignore modem control lines
     tty.c_cflag |= CREAD;  // Enable receiver
