@@ -45,12 +45,15 @@ public:
     void set_encoders(int a, int b, int c);
     void reset_encoders();
     void send_timesync();
+    static void set_verbose();
+
+    static bool is_running();
 
     drive_mode_t drive_mode;
     mbot_params_t params;
     mac_address_t mac_address;
     std::string name;
-    int is_alive;
+    bool is_alive;
 
 private:
     // Thread safe class
@@ -105,11 +108,12 @@ private:
 
     void update_mbot(uint8_t *data);
 
-    static std::string mac_to_string(const mac_address_t mac_address);                // converts mac_address_t to std::string
+    // Static variables and functions for robot_thread()
+    static thread_safe_t<bool> verbose;
+    
+    static std::string mac_to_string(const mac_address_t mac_address); // converts mac_address_t to std::string
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
-    static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
-
-    static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
+    static std::unordered_map<std::string, mbot *> mbots;       // contains pointers to all instatiated mbot objects
 
     static thread_safe_t<bool> running; // set true on the first instatiated mbot object
     static void recv_th();              // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?

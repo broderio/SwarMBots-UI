@@ -96,7 +96,6 @@ mbot::packet_t &mbot::packet_t::operator=(const mbot::packet_t &other)
 // Set static bool false for initial constructor
 mbot::thread_safe_t<bool> mbot::running(false);
 std::unordered_map<std::string, mbot *> mbot::mbots;
-mbot::thread_safe_t<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
 int mbot::serial_port;
 std::string mbot::port;
@@ -106,6 +105,7 @@ std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
+mbot::thread_safe_t<bool> mbot::verbose;
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
 mbot::mbot(const std::string &name, const std::string &mac_address)
@@ -117,12 +117,10 @@ mbot::mbot(const std::string &name, const std::string &mac_address)
     // Add the robot to the swarm
     mbots.insert(std::pair<std::string, mbot *>(mac_address, this));
 
-    // Increment the number of robots
-    num_mbots.set(num_mbots.get() + 1);
-
-    // Start the thread
-    if (!running.get())
+    // Start the thread if this is our first bot
+    if (!running.get() && mbots.size() == 1)
     {
+        verbose.set(false);
         running.set(true);
 
         // Set start time for timesync offset
@@ -149,13 +147,11 @@ mbot::~mbot()
         mbots.erase(mac_str);
     }
 
-    // Decrement the number of robots
-    num_mbots.set(num_mbots.get() - 1);
-
     // Stop the thread if there are no more robots
-    if (num_mbots.get() == 0)
+    if (mbots.size() == 0)
     {
         running.set(false);
+        send_cv.notify_one();
         send_th_handle.join();
         mbot_th_handle.join();
     }
@@ -261,6 +257,8 @@ serial_mbot_motor_vel_t mbot::get_motor_vel_goal()
 
 void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 {
+    if (!is_alive || !running.get())
+        return;
     this->robot_vel_goal.vx = vx;
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
@@ -288,6 +286,8 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 
 void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
 {
+    if (!is_alive || !running.get())
+        return;
     // TODO: make sure I'm doing this right
     this->motor_vel_goal.velocity[0] = a;
     this->motor_vel_goal.velocity[1] = b;
@@ -321,6 +321,8 @@ serial_mbot_motor_pwm_t mbot::get_motor_pwm()
 
 void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 {
+    if (!is_alive || !running.get())
+        return;
     serial_mbot_motor_pwm_t mbot_pwm;
     mbot_pwm.pwm[0] = a;
     mbot_pwm.pwm[1] = b;
@@ -360,6 +362,8 @@ serial_mbot_encoders_t mbot::get_encoders()
 
 void mbot::set_odom(float x, float y, float theta)
 {
+    if (!is_alive || !running.get())
+        return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = x;
     mbot_odom.y = y;
@@ -389,6 +393,8 @@ void mbot::set_odom(float x, float y, float theta)
 
 void mbot::reset_odom()
 {
+    if (!is_alive || !running.get())
+        return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = 0;
     mbot_odom.y = 0;
@@ -418,6 +424,8 @@ void mbot::reset_odom()
 
 void mbot::set_encoders(int a, int b, int c = 0)
 {
+    if (!is_alive || !running.get())
+        return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = a;
     mbot_encoders.ticks[1] = b;
@@ -447,6 +455,8 @@ void mbot::set_encoders(int a, int b, int c = 0)
 
 void mbot::reset_encoders()
 {
+    if (!is_alive || !running.get())
+        return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = 0;
     mbot_encoders.ticks[1] = 0;
@@ -476,6 +486,8 @@ void mbot::reset_encoders()
 
 void mbot::send_timesync()
 {
+    if (!is_alive || !running.get())
+        return;
     serial_timestamp_t timestamp;
 
     timestamp.utime = get_time_millis() - start_time.get();
@@ -499,6 +511,16 @@ void mbot::send_timesync()
 
     // alert the send thread there is work to do
     send_cv.notify_one();
+}
+
+void mbot::set_verbose()
+{
+    verbose.set(true);
+}
+
+bool mbot::is_running()
+{
+    return running.get();
 }
 
 void mbot::update_mbot(uint8_t *data)
@@ -527,11 +549,6 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
 
 void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
 {
-    uint8_t trigger_val = 0x00;
-    while (trigger_val != 0xff)
-    {
-        read(serial_port, &trigger_val, 1);
-    }
     read(serial_port, pkt_len, 2);
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }
@@ -640,6 +657,16 @@ void mbot::recv_th()
         perror("Error from tcsetattr");
         return;
     }
+    std::ofstream outputFile;
+    if (verbose.get())
+    {
+        outputFile = std::ofstream("../../log.txt", std::ios::out);
+        if (!outputFile.is_open())
+        {
+            std::cerr << "Error opening the log file!" << std::endl;
+            verbose.set(false);
+        }
+    }
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
@@ -650,7 +677,7 @@ void mbot::recv_th()
     // auto start_t = std::chrono::high_resolution_clock::now();
     // std::unordered_map<std::string, int> valid_packets_per_mac;
     while (running.get())
-    {   
+    {
         // Debug
         // auto current_time = std::chrono::high_resolution_clock::now();
         // std::chrono::duration<double> elapsed = current_time - start_t;
@@ -664,12 +691,45 @@ void mbot::recv_th()
         //     num_invalid_packets = 0; // reset the count
         //     start_t = current_time; // reset the start time
         // }
-        
+
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
-        read_mac_address(mac_address, &pkt_len);
-        if (pkt_len != 204) continue;
+        uint8_t trigger_val = 0x00;
+        while (read(serial_port, &trigger_val, 1) == 0);
+
+        if (trigger_val == 0xff)
+        {
+            read_mac_address(mac_address, &pkt_len);
+        }
+        else if (verbose.get())
+        {
+            uint8_t count = 1;
+            std::string esp;
+            esp.append(1, char(trigger_val));
+            while (char(trigger_val) != '\n')
+            {
+                if (read(serial_port, &trigger_val, 1) == 0)
+                    continue;
+                esp.append(1, char(trigger_val));
+                ++count;
+            }
+            
+            if (esp.find("ESP-ROM:") != std::string::npos)
+            {
+                std::cerr << "\n\nERROR: Host device crashed. Check log.txt for ESP prints if in verbose mode.\n";
+                std::cerr << "Closing serial port. Use CTRL + C to exit.\n";
+                close(serial_port);
+                outputFile.close();
+                running.set(false);
+                return;
+            }
+
+            outputFile << esp;
+        }
+
+        if (pkt_len != 204)
+            continue;
 
         uint8_t msg_data_serialized[pkt_len];
         uint8_t data_checksum = 0;
@@ -694,6 +754,8 @@ void mbot::recv_th()
 
         curr_mbot->update_mbot(msg_data_serialized);
     }
+    outputFile.close();
+    close(serial_port);
 }
 
 void mbot::send_th()
@@ -706,6 +768,8 @@ void mbot::send_th()
             while (send_queue.empty())
             {
                 send_cv.wait(queue_lock);
+                if (!running.get())
+                    return;
             }
             packet = send_queue.front();
             send_queue.pop();
