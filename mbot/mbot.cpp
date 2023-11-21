@@ -519,6 +519,12 @@ void mbot::update_mbot(packets_wrapper_t *pkt)
     this->robot_vel.set(pkt->mbot_vel);
     this->motor_vel.set(pkt->motor_vel);
     this->motor_pwm.set(pkt->motor_pwm);
+
+    // Call the user defined callback function
+    if (update_cb)
+    {
+        update_cb(this);
+    }
 }
 
 // comms.h functions
@@ -613,11 +619,14 @@ std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packe
         << "\"y\":" << packets_wrapper->odom.y << ","
         << "\"theta\":" << packets_wrapper->odom.theta << ","
         << "\"vx\":" << packets_wrapper->mbot_vel.vx << ","
-        << "\"vy\":" << packets_wrapper->mbot_vel.vy << ","
+        // << "\"vy\":" << packets_wrapper->mbot_vel.vy << ","
         << "\"wz\":" << packets_wrapper->mbot_vel.wz << ","
-        << "\"va\":" << packets_wrapper->motor_vel.velocity[0] << ","
-        << "\"vb\":" << packets_wrapper->motor_vel.velocity[1] << ","
-        << "\"vc\":" << packets_wrapper->motor_vel.velocity[2]
+        << "\"a\":" << packets_wrapper->encoders.ticks[0] << ","
+        << "\"b\":" << packets_wrapper->encoders.ticks[1] << ","
+        << "\"c\":" << packets_wrapper->encoders.ticks[2]
+        // << "\"va\":" << packets_wrapper->motor_vel.velocity[0] << ","
+        // << "\"vb\":" << packets_wrapper->motor_vel.velocity[1] << ","
+        // << "\"vc\":" << packets_wrapper->motor_vel.velocity[2]
         << "}";
 
     // Return the JSON string

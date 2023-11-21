@@ -49,6 +49,8 @@ public:
 
     static void start_server();
 
+    static void on_update(std::function<void(mbot*)> callback);
+
     drive_mode_t drive_mode;
     mbot_params_t params;
     mac_address_t mac_address;
@@ -95,7 +97,6 @@ private:
     };
     static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
 
-
     thread_safe_t<serial_twist2D_t> robot_vel;
     thread_safe_t<serial_mbot_imu_t> imu;
     thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
@@ -109,6 +110,9 @@ private:
     std::mutex usb_mtx;
 
     void update_mbot(packets_wrapper_t *pkt);
+
+    // User defined callback function for update
+    std::function<void(mbot*)> update_cb;
 
     static std::string mac_to_string(const mac_address_t mac_address);                // converts mac_address_t to std::string
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
@@ -134,14 +138,14 @@ private:
     static void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len);
     static uint8_t checksum(uint8_t* addends, int len);
 
-    // Other functions and members
-    static thread_safe_t<uint64_t> start_time;
-    static uint64_t get_time_millis();
-
     // Server functions and members
     static telemetry_server server;
     static thread_safe_t<bool> server_running;
     static std::thread server_th_handle;
+
+    // Other functions and members
+    static thread_safe_t<uint64_t> start_time;
+    static uint64_t get_time_millis();
 };
 
 #endif

@@ -275,7 +275,8 @@
             };
 
             ws.onmessage = function (e) {
-                mbot = JSON.parse(e.data);
+                let data = e.data.replace(/nan/g, '0');
+                mbot = JSON.parse(data);
                 if (!(mbot.mac in mbots)) {
                     addMbot(mbot);
                 }

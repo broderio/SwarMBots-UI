@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <unistd.h>
 #include <fstream>
 
@@ -12,17 +13,16 @@ int main(int argc, char *argv[]) {
     std::string port = argv[1];
     std::string file_path = argv[2];
 
-    mbot::port = port;
-    std::ifstream file(file_path);
-    std::string mac_str;
-    std::getline(file, mac_str);
-    std::cout << "MAC address: " << mac_str << "\n";
-
     // Create mbot object
-    mbot m("mbot", mac_str);
-    mbot::start_server();
+    mbot::port = port;
+    std::vector<mbot> mbots = mbot::init_from_file(file_path);
     
-    m.reset_odom();
+    // mbots[0].set_odom(0, 0.5, 0);
+    mbots[0].reset_odom();
+    mbots[0].reset_encoders();
+    // mbots[2].set_odom(0, -0.5, 0);
+
+    mbot::start_server();
 
     while (1) {
         sleep(1);
