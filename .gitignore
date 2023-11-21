@@ -4,3 +4,5 @@ Debug/**
 bin/**
 macs.txt
 .DS_store
+log.txt
+macs.txt

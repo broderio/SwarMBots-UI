@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <fstream>
 
 #include "mbot.h"
 
@@ -84,7 +85,6 @@ mbot::packet_t& mbot::packet_t::operator=(const mbot::packet_t& other){
 // Set static bool false for initial constructor
 mbot::thread_safe_t<bool> mbot::running(false);
 std::unordered_map<std::string, mbot *> mbot::mbots;
-mbot::thread_safe_t<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
 int mbot::serial_port;
 std::string mbot::port_name;
@@ -111,13 +111,10 @@ mbot::mbot(const std::string &name, const mac_address_t mac_address, const std::
     this->params = params;
     this->is_alive = true;
     // Add the robot to the swarm
-    mbots.insert(std::pair<std::string, mbot *>(mac_str, this));
+    mbots.insert(std::pair<std::string, mbot *>(mac_to_string(mac_address), this));
 
-    // Increment the number of robots
-    num_mbots.set(num_mbots.get() + 1);
-
-    // Start the thread
-    if (!running.get())
+    // Start the thread if this is our first bot
+    if (!running.get() && mbots.size() == 1)
     {
         verbose.set(false);
         //TODO: read the txt file containing the mac addresses of the clients and initialize map
@@ -137,13 +134,12 @@ mbot::~mbot()
     std::string mac_str = mac_to_string(mac_address);
     mbots.erase(mac_str);
 
-    // Decrement the number of robots
-    num_mbots.set(num_mbots.get() - 1);
 
     // Stop the thread if there are no more robots
-    if (num_mbots.get() == 0)
+    if (mbots.size() == 0)
     {
         running.set(false);
+        send_cv.notify_one();
         send_th_handle.join();
         mbot_th_handle.join();
     }
@@ -188,7 +184,7 @@ serial_mbot_motor_vel_t mbot::get_motor_vel_goal()
 
 void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     this->robot_vel_goal.vx = vx;
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
@@ -216,7 +212,7 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 
 void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     // TODO: make sure I'm doing this right
     this->motor_vel_goal.velocity[0] = a;
     this->motor_vel_goal.velocity[1] = b;
@@ -250,7 +246,7 @@ serial_mbot_motor_pwm_t mbot::get_motor_pwm()
 
 void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_mbot_motor_pwm_t mbot_pwm;
     mbot_pwm.pwm[0] = a;
     mbot_pwm.pwm[1] = b;
@@ -290,7 +286,7 @@ serial_mbot_encoders_t mbot::get_encoders()
 
 void mbot::set_odom(float x, float y, float theta)
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = x;
     mbot_odom.y = y;
@@ -320,7 +316,7 @@ void mbot::set_odom(float x, float y, float theta)
 
 void mbot::reset_odom()
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = 0;
     mbot_odom.y = 0;
@@ -350,7 +346,7 @@ void mbot::reset_odom()
 
 void mbot::set_encoders(int a, int b, int c = 0)
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = a;
     mbot_encoders.ticks[1] = b;
@@ -380,7 +376,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
 
 void mbot::reset_encoders()
 {
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = 0;
     mbot_encoders.ticks[1] = 0;
@@ -409,7 +405,7 @@ void mbot::reset_encoders()
 }
 
 void mbot::send_timesync(){
-    if (!is_alive) return;
+    if (!is_alive || !running.get()) return;
     serial_timestamp_t timestamp;
     auto currentTimePoint = std::chrono::high_resolution_clock::now();
     
@@ -443,6 +439,10 @@ void mbot::send_timesync(){
 
 void mbot::set_verbose(){
     verbose.set(true);
+}
+
+bool mbot::is_running(){
+    return running.get();
 }
 
 void mbot::update_mbot(message_topics topic, uint8_t *data)
@@ -494,7 +494,7 @@ void mbot::recv_th()
         return;
     }
 
-    tty.c_cflag = B921600; // Set your desired baud rate
+    tty.c_cflag = B115200; // Set your desired baud rate
     tty.c_cflag |= CS8;    // 8-bit data
     tty.c_cflag |= CLOCAL; // Ignore modem control lines
     tty.c_cflag |= CREAD;  // Enable receiver
@@ -504,6 +504,14 @@ void mbot::recv_th()
     {
         perror("Error from tcsetattr");
         return;
+    }
+    std::ofstream outputFile;
+    if (verbose.get()){
+        outputFile = std::ofstream("../../log.txt", std::ios::out);
+        if (!outputFile.is_open()) {
+            std::cerr << "Error opening the log file!" << std::endl;
+            verbose.set(false);
+        }
     }
 
     // start the write thread now that the serial port is open
@@ -519,7 +527,7 @@ void mbot::recv_th()
         uint8_t trigger_val = 0x00;
         while (read(serial_port, &trigger_val, 1) == 0);
         if (trigger_val == 0xff) read_mac_address(serial_port, mac_address, &pkt_len);
-        else if (verbose.get()){
+        else{
             uint8_t count = 1;
             buffer[0] = char(trigger_val);
             while(char(trigger_val) != '\n'){
@@ -527,9 +535,17 @@ void mbot::recv_th()
                 buffer[count] = char(trigger_val);
                 ++count;
             }
-            buffer[count] = '\n';
-            buffer[count + 1] = '\0';
-            printf("%s", buffer);
+            buffer[count] = '\0';
+            std::string esp(buffer);
+            if (esp.find("ESP-ROM:") != std::string::npos){
+                std::cerr << "\n\nERROR: Host device crashed. Check log.txt for ESP prints if in verbose mode.\n";
+                std::cerr << "Closing serial port. Use CTRL + C to exit.\n";
+                close(serial_port);
+                outputFile.close();
+                running.set(false);
+                return;
+            }
+            if (verbose.get()) outputFile << buffer;
         }
 
         uint8_t header_data[ROS_HEADER_LEN];
@@ -552,6 +568,8 @@ void mbot::recv_th()
 
         curr_mbot->update_mbot((message_topics)topic_id, msg_data_serialized);
     }
+    outputFile.close();
+    close(serial_port);
 }
 
 void mbot::send_th()
@@ -564,6 +582,7 @@ void mbot::send_th()
             while (send_queue.empty())
             {
                 send_cv.wait(queue_lock);
+                if (!running.get()) return;
             }
             packet = send_queue.front();
             send_queue.pop();
@@ -576,15 +595,6 @@ void mbot::send_th()
         else
         {
             printf("Sent %ld bytes\n", bytes_written);
-            char buffer[256];
-            // Read data from the device, should get ACK
-            if (bytes_written == 25){
-                int bytes_read = read(serial_port, buffer, sizeof(buffer));
-                if (bytes_read > 0) {
-                    buffer[bytes_read] = '\0';
-                    printf("Received: %s", buffer);
-                }
-            }
         }
     }
 }
