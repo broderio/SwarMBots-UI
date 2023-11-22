@@ -547,7 +547,9 @@ void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
     {
         read(serial_port, &trigger_val, 1);
     }
-    read(serial_port, pkt_len, 2);
+    uint8_t pkt_len_buf[2];
+    read(serial_port, pkt_len_buf, 2);
+    *pkt_len = (uint16_t)pkt_len_buf[0] + ((uint16_t)pkt_len_buf[1] << 8);
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }
 
@@ -731,6 +733,8 @@ void mbot::recv_th()
 
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
+
+
 
         if (server_running.get())
         {
