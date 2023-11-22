@@ -3,3 +3,4 @@ build/**
 debug/**
 macs.txt
 .DS_store
+data/**
