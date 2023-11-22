@@ -547,9 +547,17 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
     return 255 - ((sum) % 256);
 }
 
+
 void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
 {
-    read(serial_port, pkt_len, 2);
+    uint8_t trigger_val = 0x00;
+    while (trigger_val != 0xff)
+    {
+        read(serial_port, &trigger_val, 1);
+    }
+    uint8_t pkt_len_buf[2];
+    read(serial_port, pkt_len_buf, 2);
+    *pkt_len = (uint16_t)pkt_len_buf[0] + ((uint16_t)pkt_len_buf[1] << 8);
     read(serial_port, mac_address, MAC_ADDR_LEN);
 }
 
@@ -660,7 +668,7 @@ void mbot::recv_th()
     std::ofstream outputFile;
     if (verbose.get())
     {
-        outputFile = std::ofstream("../../log.txt", std::ios::out);
+        outputFile = std::ofstream("log.txt", std::ios::out);
         if (!outputFile.is_open())
         {
             std::cerr << "Error opening the log file!" << std::endl;
@@ -695,41 +703,33 @@ void mbot::recv_th()
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
-        uint8_t trigger_val = 0x00;
-        while (read(serial_port, &trigger_val, 1) == 0);
 
-        if (trigger_val == 0xff)
-        {
-            read_mac_address(mac_address, &pkt_len);
+        uint8_t trigger_val;
+        uint8_t bytes_read = 0;
+        std::stringstream buffer;
+        while (trigger_val != 0xff) {
+            read(serial_port, &trigger_val, 1);
+            std::cout << (int)trigger_val << '\n';
+            if (verbose.get())
+                buffer << char(trigger_val);
         }
-        else if (verbose.get())
-        {
-            uint8_t count = 1;
-            std::string esp;
-            esp.append(1, char(trigger_val));
-            while (char(trigger_val) != '\n')
-            {
-                if (read(serial_port, &trigger_val, 1) == 0)
-                    continue;
-                esp.append(1, char(trigger_val));
-                ++count;
-            }
-            outputFile << esp;
-            
-            if (esp.find("ESP-ROM:") != std::string::npos)
-            {
-                std::cerr << "\n\nERROR: Host device crashed. Check log.txt for ESP prints if in verbose mode.\n";
-                std::cerr << "Closing serial port. Use CTRL + C to exit.\n";
-                close(serial_port);
+
+        if (verbose.get()) {
+            std::string buf_str = buffer.str();
+            outputFile << buf_str;
+            if (buf_str.find("ESP-ROM:") != std::string::npos) {
+                std::cerr << "Host device crashed!" << std::endl;
                 outputFile.close();
-                running.set(false);
-                return;
+                exit(1);
             }
-
         }
+        
+        read_mac_address(mac_address, &pkt_len);
 
         if (pkt_len != 204)
+        {   
             continue;
+        }
 
         uint8_t msg_data_serialized[pkt_len];
         uint8_t data_checksum = 0;
@@ -738,6 +738,7 @@ void mbot::recv_th()
         if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
         {
             // num_invalid_packets++;
+            std::cout << "Invalid packet\n";
             continue;
         }
 
