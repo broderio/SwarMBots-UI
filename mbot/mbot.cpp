@@ -524,6 +524,14 @@ void mbot::update_mbot(packets_wrapper_t *pkt)
     }
 }
 
+void mbot::reconnect()
+{
+    for (auto &mbot : mbots)
+    {
+        mbot.second->send_timesync();
+    }
+}
+
 // comms.h functions
 
 uint8_t mbot::checksum(uint8_t *addends, int len)
@@ -693,22 +701,38 @@ void mbot::recv_th()
         uint8_t checksum_val;
         uint16_t pkt_len;
 
+        bool timeout = false;
+        size_t timeout_count = 0;
         uint8_t trigger_val = 0x00;
         std::vector<char> buffer; // Need to use vector becuase of null terminator in data
         while (trigger_val != 0xff)
         {
             read(serial_port, &trigger_val, 1);
+            timeout_count++;
+
             // Only append valid ascii characters
             if (verbose.load() && trigger_val > 0 && trigger_val < 128)
                 buffer.push_back(trigger_val);
+
+            if (timeout_count > 512)
+            {
+                timeout = true;
+                break;
+            }
         }
 
         if (verbose.load())
         {
             std::string buf_str(buffer.begin(), buffer.end());
             outputFile << buf_str << std::flush;
-            // TODO: Implement crash detection
+            if (buf_str.find("boot:") != std::string::npos) {
+                std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
+                reconnect();
+            }
         }
+
+        if (timeout)
+            continue;
 
         read_mac_address(mac_address, &pkt_len);
         if (pkt_len != 204)

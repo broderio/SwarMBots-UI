@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
     mbot::set_verbose();
     mbot::start_server();
     std::cout << "Number of mbot objects: " << mbot_list.size() << "\n";
-    usleep(5000000);
+    while (true) 
+        usleep(100000);
     exit(0);
 }

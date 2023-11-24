@@ -94,6 +94,7 @@ private:
     serial_mbot_motor_vel_t motor_vel_goal;
 
     void update_mbot(packets_wrapper_t *pkt);
+    static void reconnect();
 
     // User defined callback function for update
     std::function<void(mbot*)> update_cb;
@@ -105,7 +106,7 @@ private:
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
     static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
 
-    static std::atomic<int> num_mbots; // total  number of instatiated mbots
+    static std::atomic<int> num_mbots; // total number of instatiated mbots
 
     static std::atomic<bool> running; // set true on the first instatiated mbot object
     static void recv_th();              // updates all instatiated mbot objects
