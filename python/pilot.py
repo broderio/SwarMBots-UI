@@ -53,6 +53,9 @@ def main():
 
     # Send packets to each MAC address
     for mac in mac_list:
+        if (mac[0] == '#'):
+            continue
+        
         pkt = create_pkt(mac)
         print(f"Sending {len(pkt)} bytes to {mac}")
         ser.write(pkt)

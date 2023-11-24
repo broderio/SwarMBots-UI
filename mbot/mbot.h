@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <condition_variable>
 #include <unordered_map>
 #include <string>
@@ -14,6 +15,7 @@
 #include "msgtypes.h"
 #include "mbot_params.h"
 #include "comms.h"
+#include "telemetry_server.h"
 
 using mac_address_t = uint8_t[MAC_ADDR_LEN];
 
@@ -22,12 +24,12 @@ class mbot
 public:
     mbot();
     mbot(const std::string &, const std::string &);
-    ~mbot();
     mbot(const mbot &);
+    ~mbot();
 
     static std::string port;
 
-    static std::vector<mbot> init_from_file(const std::string &filename);
+    static std::vector<mbot> init_from_file(const std::string &file_name);
 
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();
@@ -49,28 +51,15 @@ public:
 
     static bool is_running();
 
-    drive_mode_t drive_mode;
-    mbot_params_t params;
+    static void start_server();
+
+    static void on_update(std::function<void(mbot*)> callback);
+
     mac_address_t mac_address;
     std::string name;
     bool is_alive;
 
 private:
-    // Thread safe class
-    template <typename T>
-    class thread_safe_t
-    {
-    public:
-        thread_safe_t();
-        thread_safe_t(T data);
-        ~thread_safe_t();
-        T get();
-        void set(T data);
-
-    private:
-        T data;
-        std::mutex mtx;
-    };
 
     // Packet object
     class packet_t
@@ -93,30 +82,33 @@ private:
         serial_mbot_motor_vel_t motor_vel;
         serial_mbot_motor_pwm_t motor_pwm;
     };
+    static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
 
-    thread_safe_t<serial_twist2D_t> robot_vel;
-    thread_safe_t<serial_mbot_imu_t> imu;
-    thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
-    thread_safe_t<serial_mbot_motor_pwm_t> motor_pwm;
-    thread_safe_t<serial_pose2D_t> odom;
-    thread_safe_t<serial_mbot_encoders_t> encoders;
+    std::atomic<serial_twist2D_t> robot_vel;
+    std::atomic<serial_mbot_imu_t> imu;
+    std::atomic<serial_mbot_motor_vel_t> motor_vel;
+    std::atomic<serial_mbot_motor_pwm_t> motor_pwm;
+    std::atomic<serial_pose2D_t> odom;
+    std::atomic<serial_mbot_encoders_t> encoders;
     serial_twist2D_t robot_vel_goal;
     serial_mbot_motor_vel_t motor_vel_goal;
 
-    // Mutex for USB
-    std::mutex usb_mtx;
+    void update_mbot(packets_wrapper_t *pkt);
 
-    void update_mbot(uint8_t *data);
+    // User defined callback function for update
+    std::function<void(mbot*)> update_cb;
 
     // Static variables and functions for robot_thread()
-    static thread_safe_t<bool> verbose;
+    static std::atomic<bool> verbose;
     
     static std::string mac_to_string(const mac_address_t mac_address); // converts mac_address_t to std::string
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
-    static std::unordered_map<std::string, mbot *> mbots;       // contains pointers to all instatiated mbot objects
+    static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
 
-    static thread_safe_t<bool> running; // set true on the first instatiated mbot object
-    static void recv_th();              // updates all instatiated mbot objects **Shouldn't this read USB and alert Mbots?
+    static std::atomic<int> num_mbots; // total  number of instatiated mbots
+
+    static std::atomic<bool> running; // set true on the first instatiated mbot object
+    static void recv_th();              // updates all instatiated mbot objects
     static std::thread mbot_th_handle;
     static int serial_port;
 
@@ -133,8 +125,13 @@ private:
     static void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len);
     static uint8_t checksum(uint8_t* addends, int len);
 
+    // Server functions and members
+    static telemetry_server server;
+    static std::atomic<bool> server_running;
+    static std::thread server_th_handle;
+
     // Other functions and members
-    static thread_safe_t<uint64_t> start_time;
+    static std::atomic<uint64_t> start_time;
     static uint64_t get_time_millis();
 };
 

@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/lib/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+
 project(SwarMBots-UI)
 
 # specify the C++ standard
