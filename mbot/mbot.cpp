@@ -73,6 +73,7 @@ std::thread mbot::send_th_handle;
 std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
+std::atomic<bool> mbot::verbose;
 
 // Constructor for mbot class. This function is not thread safe! Mbots should not be instantiated concurrently.
 mbot::mbot(const std::string &name, const std::string &mac_address)
@@ -88,9 +89,10 @@ mbot::mbot(const std::string &name, const std::string &mac_address)
     num_mbots++;
 
     // Start the thread
-    if (!running.load())
+    if (!running.load() && num_mbots.load() == 1)
     {
         running.store(true);
+        verbose.store(false);
 
         // Set start time for timesync offset
         start_time.store(get_time_millis());
@@ -123,6 +125,7 @@ mbot::~mbot()
     if (num_mbots.load() == 0)
     {
         running.store(false);
+        send_cv.notify_one();
         send_th_handle.join();
         mbot_th_handle.join();
     }
@@ -230,6 +233,8 @@ serial_mbot_motor_vel_t mbot::get_motor_vel_goal()
 
 void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 {
+    if (!is_alive || !running.load())
+        return;
     this->robot_vel_goal.vx = vx;
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
@@ -257,6 +262,8 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 
 void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
 {
+    if (!is_alive || !running.load())
+        return;
     // TODO: make sure I'm doing this right
     this->motor_vel_goal.velocity[0] = a;
     this->motor_vel_goal.velocity[1] = b;
@@ -290,6 +297,8 @@ serial_mbot_motor_pwm_t mbot::get_motor_pwm()
 
 void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 {
+    if (!is_alive || !running.load())
+        return;
     serial_mbot_motor_pwm_t mbot_pwm;
     mbot_pwm.pwm[0] = a;
     mbot_pwm.pwm[1] = b;
@@ -329,6 +338,8 @@ serial_mbot_encoders_t mbot::get_encoders()
 
 void mbot::set_odom(float x, float y, float theta)
 {
+    if (!is_alive || !running.load())
+        return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = x;
     mbot_odom.y = y;
@@ -357,6 +368,8 @@ void mbot::set_odom(float x, float y, float theta)
 
 void mbot::reset_odom()
 {
+    if (!is_alive || !running.load())
+        return;
     serial_pose2D_t mbot_odom;
     mbot_odom.x = 0;
     mbot_odom.y = 0;
@@ -385,6 +398,8 @@ void mbot::reset_odom()
 
 void mbot::set_encoders(int a, int b, int c = 0)
 {
+    if (!is_alive || !running.load())
+        return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = a;
     mbot_encoders.ticks[1] = b;
@@ -413,6 +428,8 @@ void mbot::set_encoders(int a, int b, int c = 0)
 
 void mbot::reset_encoders()
 {
+    if (!is_alive || !running.load())
+        return;
     serial_mbot_encoders_t mbot_encoders;
     mbot_encoders.ticks[0] = 0;
     mbot_encoders.ticks[1] = 0;
@@ -441,6 +458,8 @@ void mbot::reset_encoders()
 
 void mbot::send_timesync()
 {
+    if (!is_alive || !running.load())
+        return;
     serial_timestamp_t timestamp;
 
     timestamp.utime = get_time_millis() - start_time.load();
@@ -464,6 +483,16 @@ void mbot::send_timesync()
 
     // alert the send thread there is work to do
     send_cv.notify_one();
+}
+
+void mbot::set_verbose()
+{
+    verbose.store(true);
+}
+
+bool mbot::is_running()
+{
+    return running.load();
 }
 
 void mbot::start_server()
@@ -504,6 +533,7 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
     }
     return 255 - ((sum) % 256);
 }
+
 
 void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
 {
@@ -641,6 +671,16 @@ void mbot::recv_th()
         perror("Error from tcsetattr");
         return;
     }
+    std::ofstream outputFile;
+    if (verbose.load())
+    {
+        outputFile = std::ofstream("log.txt", std::ios::out);
+        if (!outputFile.is_open())
+        {
+            std::cerr << "Error opening the log file!" << std::endl;
+            verbose.store(false);
+        }
+    }
 
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
@@ -669,6 +709,27 @@ void mbot::recv_th()
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
+
+        uint8_t trigger_val;
+        uint8_t bytes_read = 0;
+        std::stringstream buffer;
+        while (trigger_val != 0xff) {
+            read(serial_port, &trigger_val, 1);
+            std::cout << (int)trigger_val << '\n';
+            if (verbose.load())
+                buffer << char(trigger_val);
+        }
+
+        if (verbose.load()) {
+            std::string buf_str = buffer.str();
+            outputFile << buf_str;
+            if (buf_str.find("ESP-ROM:") != std::string::npos) {
+                std::cerr << "Host device crashed!" << std::endl;
+                outputFile.close();
+                exit(1);
+            }
+        }
+        
         read_mac_address(mac_address, &pkt_len);
         if (pkt_len != 204)
             continue;
@@ -680,6 +741,7 @@ void mbot::recv_th()
         if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
         {
             // num_invalid_packets++;
+            std::cout << "Invalid packet\n";
             continue;
         }
 
@@ -702,6 +764,8 @@ void mbot::recv_th()
             server.send_data(jsonify_packets_wrapper(mac_address, pkt_wrapped));
         }
     }
+    outputFile.close();
+    close(serial_port);
 }
 
 void mbot::send_th()
@@ -714,6 +778,8 @@ void mbot::send_th()
             while (send_queue.empty())
             {
                 send_cv.wait(queue_lock);
+                if (!running.load())
+                    return;
             }
             packet = send_queue.front();
             send_queue.pop();
