@@ -1,5 +1,7 @@
-add_subdirectory(drive_triangle)
+add_subdirectory(gui)
 add_subdirectory(spin_in_place)
 add_subdirectory(print_speed)
 add_subdirectory(debug_threads)
 add_subdirectory(p_controller)
+add_subdirectory(path_recorder)
+add_subdirectory(path_follower)

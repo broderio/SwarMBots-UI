@@ -3,15 +3,16 @@
 #include <unistd.h>
 #include <fstream>
 
-using std::cout;
-using std::cin;
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+        return 1;
+    }
+    std::string port = argv[1];
+    std::string file_path = argv[2];
 
-// TODO: Make serial port and file path for macs.txt an input argument
-int main() {
-    mbot::port = "/dev/cu.usbserial-14210"; // This works on macOS
-
-    // Get first mac address from file
-    std::ifstream file("/Users/broderio/Repositories/SwarMBots-UI/macs.txt");
+    mbot::port = port;
+    std::ifstream file(file_path);
     std::string mac_str;
     std::getline(file, mac_str);
     std::cout << "Mac address: " << mac_str << "\n";
