@@ -27,8 +27,11 @@ int main(int argc, char *argv[]) {
     macs.close();
 
     // Create mbot object and start server
-    path_follower m("mbot", mac_str, 1.0, 0.06);
+    path_follower m("mbot", mac_str, 1.2, 0.08);
     path_follower::start_server();
+    m.reset_odom();
+    m.reset_encoders();
+    usleep(1000000); // Wait for odometry to reset
     std::signal(SIGINT, [](int signum) {
         flag = 0;
     });
@@ -40,9 +43,6 @@ int main(int argc, char *argv[]) {
     std::cin.get();
     std::cout << "Driving along path ...\n";
     std::cout << "Press ctrl-c to stop\n";
-    m.reset_odom();
-    m.reset_encoders();
-    usleep(1000000); // Wait for odometry to reset
 
     // Load path
     m.load_path(path_file_path);

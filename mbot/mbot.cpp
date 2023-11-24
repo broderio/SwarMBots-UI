@@ -16,43 +16,6 @@
 #define B921600 921600
 #endif
 
-// template <typename T>
-// struct is_queue : std::false_type {};
-
-// template <typename T, typename Container>
-// struct is_queue<std::queue<T, Container>> : std::true_type {};
-
-/* thread_safe_t member function definitions */
-
-template <typename T>
-mbot::thread_safe_t<T>::thread_safe_t()
-{
-    data = T();
-}
-
-template <typename T>
-mbot::thread_safe_t<T>::thread_safe_t(T data)
-{
-    this->data = data;
-}
-
-template <typename T>
-mbot::thread_safe_t<T>::~thread_safe_t() {}
-
-template <typename T>
-T mbot::thread_safe_t<T>::get()
-{
-    std::lock_guard<std::mutex> lock(mtx);
-    return data;
-}
-
-template <typename T>
-void mbot::thread_safe_t<T>::set(T data)
-{
-    std::lock_guard<std::mutex> lock(mtx);
-    this->data = data;
-}
-
 /* packet defintiion */
 
 mbot::packet_t::packet_t()
@@ -94,15 +57,15 @@ mbot::packet_t &mbot::packet_t::operator=(const mbot::packet_t &other)
 /* mbot member function definitions */
 
 // Set static bool false for initial constructor
-mbot::thread_safe_t<bool> mbot::running(false);
+std::atomic<bool> mbot::running(false);
 std::unordered_map<std::string, mbot *> mbot::mbots;
-mbot::thread_safe_t<int> mbot::num_mbots;
+std::atomic<int> mbot::num_mbots;
 std::thread mbot::mbot_th_handle;
 int mbot::serial_port;
 std::string mbot::port;
-mbot::thread_safe_t<uint64_t> mbot::start_time;
+std::atomic<uint64_t> mbot::start_time;
 
-mbot::thread_safe_t<bool> mbot::server_running(false);
+std::atomic<bool> mbot::server_running(false);
 telemetry_server mbot::server;
 std::thread mbot::server_th_handle;
 
@@ -122,15 +85,15 @@ mbot::mbot(const std::string &name, const std::string &mac_address)
     mbots.insert(std::pair<std::string, mbot *>(mac_address, this));
 
     // Increment the number of robots
-    num_mbots.set(num_mbots.get() + 1);
+    num_mbots++;
 
     // Start the thread
-    if (!running.get())
+    if (!running.load())
     {
-        running.set(true);
+        running.store(true);
 
         // Set start time for timesync offset
-        start_time.set(get_time_millis());
+        start_time.store(get_time_millis());
 
         // Start the thread
         mbot_th_handle = std::move(std::thread(&mbot::recv_th));
@@ -154,12 +117,12 @@ mbot::~mbot()
     }
 
     // Decrement the number of robots
-    num_mbots.set(num_mbots.get() - 1);
+    num_mbots--;
 
     // Stop the thread if there are no more robots
-    if (num_mbots.get() == 0)
+    if (num_mbots.load() == 0)
     {
-        running.set(false);
+        running.store(false);
         send_th_handle.join();
         mbot_th_handle.join();
     }
@@ -173,7 +136,7 @@ mbot::mbot(const mbot &other)
     std::memcpy(this->mac_address, other.mac_address, MAC_ADDR_LEN);
     this->is_alive = other.is_alive;
 
-    // Update map with new pointer (not sure if this would be expected behavior?)
+    // Update map with new pointer
     // Updating the map in this way means that only the most recent copy of an mbot
     // will be updated by the recv_th thread. I think this is the best (maybe only?) way
     // to handle this situation. If we used the original pointer, then it could be deleted
@@ -181,10 +144,12 @@ mbot::mbot(const mbot &other)
     mbots[mac_str] = this;
 }
 
-std::vector<mbot> mbot::init_from_file(const std::string &filename)
+
+
+std::vector<mbot> mbot::init_from_file(const std::string &file_name)
 {
     // Given a file with a list of MAC addresses, return an array of mbots
-    std::ifstream file(filename);
+    std::ifstream file(file_name);
     std::string line;
 
     // Read the file and get the number of bots and the mac addresses
@@ -240,17 +205,17 @@ void mbot::string_to_mac(const std::string &mac_str, mac_address_t mac_address)
 
 serial_twist2D_t mbot::get_robot_vel()
 {
-    return this->robot_vel.get();
+    return this->robot_vel.load();
 }
 
 serial_mbot_imu_t mbot::get_imu()
 {
-    return this->imu.get();
+    return this->imu.load();
 }
 
 serial_mbot_motor_vel_t mbot::get_motor_vel()
 {
-    return this->motor_vel.get();
+    return this->motor_vel.load();
 }
 
 serial_twist2D_t mbot::get_robot_vel_goal()
@@ -320,7 +285,7 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
 
 serial_mbot_motor_pwm_t mbot::get_motor_pwm()
 {
-    return this->motor_pwm.get();
+    return this->motor_pwm.load();
 }
 
 void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
@@ -329,7 +294,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
     mbot_pwm.pwm[0] = a;
     mbot_pwm.pwm[1] = b;
     mbot_pwm.pwm[2] = c;
-    this->motor_pwm.set(mbot_pwm);
+    this->motor_pwm.store(mbot_pwm);
 
     // Initialize variables for packet
     packet_t packet;
@@ -354,12 +319,12 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 
 serial_pose2D_t mbot::get_odom()
 {
-    return this->odom.get();
+    return this->odom.load();
 }
 
 serial_mbot_encoders_t mbot::get_encoders()
 {
-    return this->encoders.get();
+    return this->encoders.load();
 }
 
 void mbot::set_odom(float x, float y, float theta)
@@ -478,7 +443,7 @@ void mbot::send_timesync()
 {
     serial_timestamp_t timestamp;
 
-    timestamp.utime = get_time_millis() - start_time.get();
+    timestamp.utime = get_time_millis() - start_time.load();
 
     // Initialize variables for packet
     packet_t packet;
@@ -504,7 +469,7 @@ void mbot::send_timesync()
 void mbot::start_server()
 {
     // TODO: Make root file an input argument
-    server_running.set(true);
+    server_running.store(true);
     server_th_handle = std::move(std::thread(&telemetry_server::run,
                                              &server,
                                              "/Users/broderio/Repositories/SwarMBots-UI",
@@ -513,12 +478,12 @@ void mbot::start_server()
 
 void mbot::update_mbot(packets_wrapper_t *pkt)
 {
-    this->encoders.set(pkt->encoders);
-    this->odom.set(pkt->odom);
-    this->imu.set(pkt->imu);
-    this->robot_vel.set(pkt->mbot_vel);
-    this->motor_vel.set(pkt->motor_vel);
-    this->motor_pwm.set(pkt->motor_pwm);
+    this->encoders.store(pkt->encoders);
+    this->odom.store(pkt->odom);
+    this->imu.store(pkt->imu);
+    this->robot_vel.store(pkt->mbot_vel);
+    this->motor_vel.store(pkt->motor_vel);
+    this->motor_pwm.store(pkt->motor_pwm);
 
     // Call the user defined callback function
     if (update_cb)
@@ -638,14 +603,12 @@ void mbot::recv_th()
     // Check if user defined port
     if (port.empty())
     {
-        // TODO: Find the port that the host is connected to
         // But for now print an error
         perror("Error: No port specified.\n");
         return;
     }
 
     // open com port host is connected to
-    // get host mac address and save it
     struct termios tty;
     serial_port = open(port.c_str(), O_RDWR);
     if (serial_port == -1)
@@ -687,7 +650,7 @@ void mbot::recv_th()
     // int num_valid_packets = 0;
     // auto start_t = std::chrono::high_resolution_clock::now();
     // std::unordered_map<std::string, int> valid_packets_per_mac;
-    while (running.get())
+    while (running.load())
     {
         // Debug
         // auto current_time = std::chrono::high_resolution_clock::now();
@@ -734,9 +697,7 @@ void mbot::recv_th()
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
 
-
-
-        if (server_running.get())
+        if (server_running.load())
         {
             server.send_data(jsonify_packets_wrapper(mac_address, pkt_wrapped));
         }
@@ -745,7 +706,7 @@ void mbot::recv_th()
 
 void mbot::send_th()
 {
-    while (running.get())
+    while (running.load())
     {
         packet_t packet;
         { // scope for which we need the lock on the queue

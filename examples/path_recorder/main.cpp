@@ -28,6 +28,9 @@ int main(int argc, char *argv[]) {
     // Create mbot object and start server
     mbot m("mbot", mac_str);
     mbot::start_server();
+    m.reset_odom();
+    m.reset_encoders();
+    usleep(1000000); // Wait for odometry to reset (1s
 
     // Open path file
     std::ofstream path_file(path_file_path);
@@ -42,8 +45,6 @@ int main(int argc, char *argv[]) {
     std::cin.get();
     std::cout << "Recording odometry ...\n";
     std::cout << "Press ctrl-c to stop recording\n";
-    m.reset_odom();
-    m.reset_encoders();
     while (flag) {
         serial_pose2D_t odom = m.get_odom();
         path_file << odom.utime << " " << odom.x << " " << odom.y << " " << odom.theta << "\n";

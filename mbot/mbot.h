@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <condition_variable>
 #include <unordered_map>
 #include <string>
@@ -28,7 +29,7 @@ public:
 
     static std::string port;
 
-    static std::vector<mbot> init_from_file(const std::string &filename);
+    static std::vector<mbot> init_from_file(const std::string &file_name);
 
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();
@@ -51,28 +52,11 @@ public:
 
     static void on_update(std::function<void(mbot*)> callback);
 
-    drive_mode_t drive_mode;
-    mbot_params_t params;
     mac_address_t mac_address;
     std::string name;
     int is_alive;
 
 private:
-    // Thread safe class
-    template <typename T>
-    class thread_safe_t
-    {
-    public:
-        thread_safe_t();
-        thread_safe_t(T data);
-        ~thread_safe_t();
-        T get();
-        void set(T data);
-
-    private:
-        T data;
-        std::mutex mtx;
-    };
 
     // Packet object
     class packet_t
@@ -97,17 +81,14 @@ private:
     };
     static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
 
-    thread_safe_t<serial_twist2D_t> robot_vel;
-    thread_safe_t<serial_mbot_imu_t> imu;
-    thread_safe_t<serial_mbot_motor_vel_t> motor_vel;
-    thread_safe_t<serial_mbot_motor_pwm_t> motor_pwm;
-    thread_safe_t<serial_pose2D_t> odom;
-    thread_safe_t<serial_mbot_encoders_t> encoders;
+    std::atomic<serial_twist2D_t> robot_vel;
+    std::atomic<serial_mbot_imu_t> imu;
+    std::atomic<serial_mbot_motor_vel_t> motor_vel;
+    std::atomic<serial_mbot_motor_pwm_t> motor_pwm;
+    std::atomic<serial_pose2D_t> odom;
+    std::atomic<serial_mbot_encoders_t> encoders;
     serial_twist2D_t robot_vel_goal;
     serial_mbot_motor_vel_t motor_vel_goal;
-
-    // Mutex for USB
-    std::mutex usb_mtx;
 
     void update_mbot(packets_wrapper_t *pkt);
 
@@ -118,9 +99,9 @@ private:
     static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
     static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
 
-    static thread_safe_t<int> num_mbots; // total  number of instatiated mbots
+    static std::atomic<int> num_mbots; // total  number of instatiated mbots
 
-    static thread_safe_t<bool> running; // set true on the first instatiated mbot object
+    static std::atomic<bool> running; // set true on the first instatiated mbot object
     static void recv_th();              // updates all instatiated mbot objects
     static std::thread mbot_th_handle;
     static int serial_port;
@@ -140,11 +121,11 @@ private:
 
     // Server functions and members
     static telemetry_server server;
-    static thread_safe_t<bool> server_running;
+    static std::atomic<bool> server_running;
     static std::thread server_th_handle;
 
     // Other functions and members
-    static thread_safe_t<uint64_t> start_time;
+    static std::atomic<uint64_t> start_time;
     static uint64_t get_time_millis();
 };
 
