@@ -534,28 +534,28 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
     return 255 - ((sum) % 256);
 }
 
+void mbot::read_bytes(uint8_t *buffer, uint16_t len)
+{
+    size_t bytes_read = 0;
+    while (bytes_read < len)
+    {
+        bytes_read += read(serial_port, buffer + bytes_read, len - bytes_read);
+    }
+}
+
 
 void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
 {
-    uint8_t trigger_val = 0x00;
-    while (trigger_val != 0xff)
-    {
-        read(serial_port, &trigger_val, 1);
-    }
     uint8_t pkt_len_buf[2];
-    read(serial_port, pkt_len_buf, 2);
-    *pkt_len = (uint16_t)pkt_len_buf[0] + ((uint16_t)pkt_len_buf[1] << 8);
-    read(serial_port, mac_address, MAC_ADDR_LEN);
+    read_bytes(pkt_len_buf, 2);
+    *pkt_len =  ((uint16_t)pkt_len_buf[1] << 8) | (uint16_t)pkt_len_buf[0];
+    read_bytes(mac_address, MAC_ADDR_LEN);
 }
 
 void mbot::read_message(uint8_t *data_serialized, uint16_t message_len, uint8_t *data_checksum)
 {
-    size_t bytes_read = 0;
-    while (bytes_read < message_len)
-    {
-        bytes_read += read(serial_port, data_serialized + bytes_read, message_len - bytes_read);
-    }
-    read(serial_port, data_checksum, 1);
+    read_bytes(data_serialized, message_len);
+    read_bytes(data_checksum, 1);
 }
 
 int mbot::validate_message(uint8_t *data_serialized, uint16_t message_len, uint8_t data_checksum)
@@ -710,24 +710,19 @@ void mbot::recv_th()
         uint8_t checksum_val;
         uint16_t pkt_len;
 
-        uint8_t trigger_val;
-        uint8_t bytes_read = 0;
-        std::stringstream buffer;
+        uint8_t trigger_val = 0x00;
+        std::vector<char> buffer; // Need to use vector becuase of null terminator in data
         while (trigger_val != 0xff) {
             read(serial_port, &trigger_val, 1);
-            std::cout << (int)trigger_val << '\n';
-            if (verbose.load())
-                buffer << char(trigger_val);
+            // Only append valid ascii characters
+            if (verbose.load() && trigger_val > 0 && trigger_val < 128)
+                buffer.push_back(trigger_val);
         }
 
         if (verbose.load()) {
-            std::string buf_str = buffer.str();
-            outputFile << buf_str;
-            if (buf_str.find("ESP-ROM:") != std::string::npos) {
-                std::cerr << "Host device crashed!" << std::endl;
-                outputFile.close();
-                exit(1);
-            }
+            std::string buf_str(buffer.begin(), buffer.end());
+            outputFile << buf_str << std::flush;
+            // std::cout << buf_str << std::flush;
         }
         
         read_mac_address(mac_address, &pkt_len);

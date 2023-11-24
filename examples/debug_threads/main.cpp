@@ -13,9 +13,9 @@ int main(int argc, char *argv[]) {
     mbot::port = port;
 
     std::vector<mbot> mbot_list = mbot::init_from_file(file_path);
+    mbot::set_verbose();
     mbot::start_server();
     std::cout << "Number of mbot objects: " << mbot_list.size() << "\n";
-    while (1) {
-        sleep(1);
-    }
+    usleep(5000000);
+    exit(0);
 }

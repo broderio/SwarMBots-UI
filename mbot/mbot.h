@@ -119,6 +119,7 @@ private:
     static std::condition_variable send_cv; // condition variable to waken the send thread
 
     // Functions moved from comms.h
+    static void read_bytes(uint8_t* buffer, uint16_t len);
     static void read_mac_address(uint8_t* mac_address, uint16_t* pkt_len);
     static void read_message(uint8_t* data_serialized, uint16_t message_len, uint8_t* data_checksum);
     static int validate_message(uint8_t* data_serialized, uint16_t message_len, uint8_t data_checksum);
