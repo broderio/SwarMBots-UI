@@ -4,14 +4,13 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+        std::cerr << "Usage: " << argv[0] << " <serial_port>\n";
         return 1;
     }
     std::string port = argv[1];
-    std::string file_path = argv[2];
 
     mbot::port = port;
-    std::vector<mbot> mbot_list = mbot::init_from_file(file_path);
+    std::vector<mbot> mbot_list = mbot::init_from_file();
     float speeds[4] = {5.0, 0.0, -5.0, 0.0};
     int i = 0;
     while (1)

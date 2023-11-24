@@ -58,15 +58,14 @@ This is an example program that starts the server, spins the robots for 5 second
 #include "mbot.h"
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port>\n";
         return 1;
     }
     std::string port = argv[1];
-    std::string file_path = argv[2];
 
     mbot::port = port;
-    std::vector<mbot> mbots = mbot::init_from_file(file_path);
+    std::vector<mbot> mbots = mbot::init_from_file();
     mbot::start_server();
 
     sleep(5);

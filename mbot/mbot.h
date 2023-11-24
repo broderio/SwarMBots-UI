@@ -29,7 +29,7 @@ public:
 
     static std::string port;
 
-    static std::vector<mbot> init_from_file(const std::string &file_name);
+    static std::vector<mbot> init_from_file(const std::string &file_name="macs.txt");
 
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();

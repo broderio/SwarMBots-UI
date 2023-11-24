@@ -147,12 +147,15 @@ mbot::mbot(const mbot &other)
     mbots[mac_str] = this;
 }
 
-
-
 std::vector<mbot> mbot::init_from_file(const std::string &file_name)
 {
     // Given a file with a list of MAC addresses, return an array of mbots
     std::ifstream file(file_name);
+    if (!file.is_open())
+    {
+        perror("Error opening MAC address file. Ensure specified path is correct.\n");
+        return std::vector<mbot>();
+    }
     std::string line;
 
     // Read the file and get the number of bots and the mac addresses
@@ -543,12 +546,11 @@ void mbot::read_bytes(uint8_t *buffer, uint16_t len)
     }
 }
 
-
 void mbot::read_mac_address(uint8_t *mac_address, uint16_t *pkt_len)
 {
     uint8_t pkt_len_buf[2];
     read_bytes(pkt_len_buf, 2);
-    *pkt_len =  ((uint16_t)pkt_len_buf[1] << 8) | (uint16_t)pkt_len_buf[0];
+    *pkt_len = ((uint16_t)pkt_len_buf[1] << 8) | (uint16_t)pkt_len_buf[0];
     read_bytes(mac_address, MAC_ADDR_LEN);
 }
 
@@ -612,7 +614,7 @@ std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packe
 
     oss << "{"
         << "\"mac\":\"" << mac_to_string(mac_address) << "\","
-        << "\"x\":" << packets_wrapper->odom.x<< ","
+        << "\"x\":" << packets_wrapper->odom.x << ","
         << "\"y\":" << packets_wrapper->odom.y << ","
         << "\"theta\":" << packets_wrapper->odom.theta << ","
         << "\"vx\":" << packets_wrapper->mbot_vel.vx << ","
@@ -685,46 +687,29 @@ void mbot::recv_th()
     // start the write thread now that the serial port is open
     send_th_handle = std::thread(&mbot::send_th);
 
-    // Debug
-    // int num_invalid_packets = 0;
-    // int num_valid_packets = 0;
-    // auto start_t = std::chrono::high_resolution_clock::now();
-    // std::unordered_map<std::string, int> valid_packets_per_mac;
     while (running.load())
     {
-        // Debug
-        // auto current_time = std::chrono::high_resolution_clock::now();
-        // std::chrono::duration<double> elapsed = current_time - start_t;
-        // if (elapsed.count() >= 1.0) { // every second
-        //     double total_packets = num_invalid_packets + num_valid_packets;
-        //     std::cout << "Packets per second: " << total_packets / elapsed.count() << ", Validity ratio: " << (double)num_valid_packets / total_packets << "\n";
-        //     for (const auto& pair : valid_packets_per_mac) {
-        //         std::cout << "MAC: " << pair.first << ", Valid packets: " << pair.second << "\n";
-        //     }
-        //     num_valid_packets = 0; // reset the count
-        //     num_invalid_packets = 0; // reset the count
-        //     start_t = current_time; // reset the start time
-        // }
-
         mac_address_t mac_address;
         uint8_t checksum_val;
         uint16_t pkt_len;
 
         uint8_t trigger_val = 0x00;
         std::vector<char> buffer; // Need to use vector becuase of null terminator in data
-        while (trigger_val != 0xff) {
+        while (trigger_val != 0xff)
+        {
             read(serial_port, &trigger_val, 1);
             // Only append valid ascii characters
             if (verbose.load() && trigger_val > 0 && trigger_val < 128)
                 buffer.push_back(trigger_val);
         }
 
-        if (verbose.load()) {
+        if (verbose.load())
+        {
             std::string buf_str(buffer.begin(), buffer.end());
             outputFile << buf_str << std::flush;
-            // std::cout << buf_str << std::flush;
+            // TODO: Implement crash detection
         }
-        
+
         read_mac_address(mac_address, &pkt_len);
         if (pkt_len != 204)
             continue;
@@ -734,21 +719,11 @@ void mbot::recv_th()
         read_message(msg_data_serialized, pkt_len, &data_checksum);
 
         if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
-        {
-            // num_invalid_packets++;
-            std::cout << "Invalid packet\n";
             continue;
-        }
-
-        // Debug
-        // if (valid_packets_per_mac.find(mac_to_string(mac_address)) == valid_packets_per_mac.end())
-        //     valid_packets_per_mac[mac_to_string(mac_address)] = 0;
-        // valid_packets_per_mac[mac_to_string(mac_address)]++;
-        // num_valid_packets++;
 
         std::string mac_str = mac_to_string(mac_address);
         if (mbots.find(mac_str) == mbots.end())
-            continue; // continue if robot is not in swarm
+            continue;
         mbot *curr_mbot = mbots[mac_str];
 
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
