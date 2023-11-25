@@ -30,21 +30,20 @@ python3 python/pilot.py [SERIAL PORT]
 This project uses `cmake` for building and compiling. To compile the examples, run the following commands.
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+chmod +x build.sh
+./build.sh
 ```
 
 To save on compile time, you can specify the example you want to compile, rather than all of them.
 
 ```bash
-make [EXAMPLE]
+./build.sh [EXAMPLE]
 ```
 
 After compilation, all of the executables are located in `build/examples/*`. To execute an example, run the following command:
 ```bash
-./build/examples/[EXAMPLE]/[EXAMPLE]
+chmod +x run.sh
+./run.sh [EXAMPLE] [ARG1] [ARG2] ... [ARGN]
 ```
 
 ## Starting the GUI
