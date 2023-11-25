@@ -76,6 +76,7 @@ std::mutex mbot::send_mutex;
 std::queue<mbot::packet_t> mbot::send_queue;
 std::condition_variable mbot::send_cv;
 std::atomic<bool> mbot::verbose;
+std::atomic<int> mbot::min_msg_rate(15);
 std::function<void(mbot*)> mbot::update_cb;
 std::mutex mbot::update_cb_mutex;
 
@@ -99,10 +100,14 @@ mbot::mbot(const std::string &name, const std::string &mac_address)
         verbose.store(false);
 
         // Set start time for timesync offset
-        start_time.store(get_time_millis());
+        start_time.store(get_time_us());
 
-        // Start the thread
+        // Init serial port
+        init_serial();
+
+        // Start the threads
         mbot_th_handle = std::move(std::thread(&mbot::recv_th));
+        send_th_handle = std::move(std::thread(&mbot::send_th));
     }
 
     // Send timesync to pair client with host
@@ -419,7 +424,7 @@ void mbot::send_timesync()
         return;
     serial_timestamp_t timestamp;
 
-    timestamp.utime = get_time_millis() - start_time.load();
+    timestamp.utime = get_time_us() - start_time.load();
 
     // Serialize message and create packet
     packet_t packet;
@@ -438,6 +443,11 @@ void mbot::send_timesync()
 void mbot::set_verbose(bool state)
 {
     verbose.store(state);
+}
+
+void mbot::set_min_msg_rate(int rate)
+{
+    min_msg_rate.store(rate);
 }
 
 bool mbot::is_running()
@@ -563,7 +573,7 @@ void mbot::encode_msg(T *msg, uint16_t topic, mac_address_t mac_address, packet_
     pkt->data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
 }
 
-uint64_t mbot::get_time_millis()
+uint64_t mbot::get_time_us()
 {
     auto currentTimePoint = std::chrono::high_resolution_clock::now();
     auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint);
@@ -591,8 +601,7 @@ std::string mbot::jsonify_packets_wrapper(mac_address_t mac_address, mbot::packe
     return oss.str();
 }
 
-// Reads all incoming data on USB
-void mbot::recv_th()
+void mbot::init_serial() 
 {
     // Check if user defined port
     if (port.empty())
@@ -635,6 +644,11 @@ void mbot::recv_th()
         perror("Error from tcsetattr");
         return;
     }
+}
+
+// Reads all incoming data on USB
+void mbot::recv_th()
+{   
     std::ofstream outputFile;
     if (verbose.load())
     {
@@ -646,9 +660,8 @@ void mbot::recv_th()
         }
     }
 
-    // start the write thread now that the serial port is open
-    send_th_handle = std::thread(&mbot::send_th);
-
+    std::unordered_map<std::string, int> msg_counts;
+    uint64_t curr_time = get_time_us();
     while (running.load())
     {
         mac_address_t mac_address;
@@ -676,41 +689,50 @@ void mbot::recv_th()
         }
 
         std::string buf_str(buffer.begin(), buffer.end());
-        if (verbose.load())
-        {
+        if (verbose.load()) 
             outputFile << buf_str << std::flush;
-        }
+
         if (buf_str.find("boot:") != std::string::npos)
         {
             std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
             reconnect();
         }
 
-        if (timeout)
-            continue;
+        if (timeout) continue;
 
         read_mac_address(mac_address, &pkt_len);
-        if (pkt_len != 204)
-            continue;
+        if (pkt_len != 204) continue;
 
         uint8_t msg_data_serialized[pkt_len];
         uint8_t data_checksum = 0;
         read_message(msg_data_serialized, pkt_len, &data_checksum);
 
-        if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
-            continue;
+        if (!validate_message(msg_data_serialized, pkt_len, data_checksum)) continue;
 
         std::string mac_str = mac_to_string(mac_address);
-        if (mbots.find(mac_str) == mbots.end())
-            continue;
+        if (mbots.find(mac_str) == mbots.end()) continue;
         mbot *curr_mbot = mbots[mac_str];
 
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
 
+        if (msg_counts.find(mac_str) == msg_counts.end())
+            msg_counts[mac_str] = 0;
+        msg_counts[mac_str]++;
+
         if (server_running.load())
-        {
             server.send_data(jsonify_packets_wrapper(mac_address, pkt_wrapped));
+
+        if (curr_time + 1000000 < get_time_us())
+        {
+            curr_time = get_time_us();
+            int min_rate = mbot::min_msg_rate.load();
+            for (auto &msg_count : msg_counts)
+            {
+                if (msg_count.second < min_rate)
+                    std::cerr << "Warning: MBot #" << msg_count.first << " sending at <" << min_rate << " Hz" << std::endl;
+                msg_count.second = 0;
+            }
         }
     }
     outputFile.close();
