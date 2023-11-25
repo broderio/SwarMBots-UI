@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     mbot::port = port;
 
     std::vector<mbot> mbot_list = mbot::init_from_file();
-    mbot::set_verbose();
+    mbot::set_verbose(true);
     mbot::start_server();
     std::cout << "Number of mbot objects: " << mbot_list.size() << "\n";
     while (true) 
