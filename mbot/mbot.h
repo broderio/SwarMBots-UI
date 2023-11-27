@@ -22,16 +22,15 @@ using mac_address_t = uint8_t[MAC_ADDR_LEN];
 class mbot
 {
 public:
-
     // Constructors and destructors
     mbot();
-    mbot(const std::string &, const std::string &);
+    mbot(const std::string &name, const std::string &mac);
     mbot(const mbot &);
     ~mbot();
-    static std::vector<mbot> init_from_file(const std::string &file_name="macs.txt");
+    static std::vector<mbot> init_from_file(const std::string &file_name = "macs.txt");
 
     // Public member variables
-    mac_address_t mac_address;
+    std::string mac;
     std::string name;
 
     // Public static variables
@@ -62,11 +61,10 @@ public:
     static void set_verbose(bool state);
     static void set_min_msg_rate(int rate);
     static bool is_running();
-    static void start_server(uint16_t port=9002);
-    static void on_update(std::function<void(mbot*)> callback);
+    static void start_server(uint16_t port = 9002);
+    static void set_on_update(std::function<void(mbot *)> callback);
 
 private:
-
     // Packet object
     class packet_t
     {
@@ -81,7 +79,8 @@ private:
     };
 
     // Wrapper packet for serial data
-    struct __attribute__((__packed__)) packets_wrapper_t {
+    struct __attribute__((__packed__)) packets_wrapper_t
+    {
         serial_mbot_encoders_t encoders;
         serial_pose2D_t odom;
         serial_mbot_imu_t imu;
@@ -106,7 +105,9 @@ private:
     std::atomic<bool> alive;
 
     // User defined callback function for update
-    static std::function<void(mbot*)> update_cb;
+    static std::function<void(mbot *)> update_cb;
+    virtual void on_update();
+    virtual serial_pose2D_t get_functional_pose();
 
     // Threads
     static std::thread send_th_handle;
@@ -133,17 +134,20 @@ private:
     static void init_serial();
     static int serial_port;
 
+    // MAC address in bytes
+    mac_address_t mac_bytes;
+
     // Functions for encoding and decoding messages
-    static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
-    static std::string mac_to_string(const mac_address_t mac_address);
-    static void string_to_mac(const std::string &mac_str, mac_address_t mac_address);
-    static void read_bytes(uint8_t* buffer, uint16_t len);
-    static void read_mac_address(uint8_t* mac_address, uint16_t* pkt_len);
-    static void read_message(uint8_t* data_serialized, uint16_t message_len, uint8_t* data_checksum);
-    static int validate_message(uint8_t* data_serialized, uint16_t message_len, uint8_t data_checksum);
-    template<typename T>
-    static void encode_msg(T* msg, uint16_t topic, mac_address_t mac_address, packet_t* pkt);
-    static uint8_t checksum(uint8_t* addends, int len);
+    static std::string jsonify_data(std::string mac_address, serial_pose2D_t odom);
+    static std::string mac_bytes_to_string(const mac_address_t mac_address);
+    static void mac_string_to_bytes(const std::string &mac_str, mac_address_t mac_address);
+    static void read_bytes(uint8_t *buffer, uint16_t len);
+    static void read_mac_address(uint8_t *mac_address, uint16_t *pkt_len);
+    static void read_message(uint8_t *data_serialized, uint16_t message_len, uint8_t *data_checksum);
+    static int validate_message(uint8_t *data_serialized, uint16_t message_len, uint8_t data_checksum);
+    template <typename T>
+    static void encode_msg(T *msg, uint16_t topic, mac_address_t mac_address, packet_t *pkt);
+    static uint8_t checksum(uint8_t *addends, int len);
 
     // Functions for updating robot state
     void update_mbot(packets_wrapper_t *pkt);
@@ -154,9 +158,9 @@ private:
     static std::atomic<int> num_mbots;
     static std::atomic<bool> running;
     static std::atomic<int> min_msg_rate;
-    
+
     // Map to store all instatiated mbot objects
-    static std::unordered_map<std::string, mbot *> mbots; 
+    static std::unordered_map<std::string, mbot *> mbots;
 
     // Thread functions for receiving and sending data
     static void recv_th();
