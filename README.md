@@ -30,21 +30,20 @@ python3 python/pilot.py [SERIAL PORT]
 This project uses `cmake` for building and compiling. To compile the examples, run the following commands.
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+chmod +x build.sh
+./build.sh
 ```
 
 To save on compile time, you can specify the example you want to compile, rather than all of them.
 
 ```bash
-make [EXAMPLE]
+./build.sh [EXAMPLE]
 ```
 
 After compilation, all of the executables are located in `build/examples/*`. To execute an example, run the following command:
 ```bash
-./build/examples/[EXAMPLE]/[EXAMPLE]
+chmod +x run.sh
+./run.sh [EXAMPLE] [ARG1] [ARG2] ... [ARGN]
 ```
 
 ## Starting the GUI
@@ -58,15 +57,14 @@ This is an example program that starts the server, spins the robots for 5 second
 #include "mbot.h"
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <serial_port> <file_path>\n";
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port>\n";
         return 1;
     }
     std::string port = argv[1];
-    std::string file_path = argv[2];
 
     mbot::port = port;
-    std::vector<mbot> mbots = mbot::init_from_file(file_path);
+    std::vector<mbot> mbots = mbot::init_from_file();
     mbot::start_server();
 
     sleep(5);

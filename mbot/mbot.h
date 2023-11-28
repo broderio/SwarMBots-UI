@@ -17,61 +17,61 @@
 #include "comms.h"
 #include "telemetry_server.h"
 
+#ifndef B921600
+#define B921600 921600
+#endif
+
 using mac_address_t = uint8_t[MAC_ADDR_LEN];
 
 class mbot
 {
 public:
-    mbot();
-    mbot(const std::string &, const std::string &);
+    // Constructors and destructors
+    mbot(const std::string &name, const std::string &mac);
     mbot(const mbot &);
     ~mbot();
+    static std::vector<mbot> init_from_file(const std::string &file_name = "macs.txt");
 
+    // Public member variables
+    std::string mac;
+    std::string name;
+
+    // Public static variables
     static std::string port;
 
-    static std::vector<mbot> init_from_file(const std::string &file_name);
-
+    // Getters
     serial_twist2D_t get_robot_vel();
     serial_mbot_imu_t get_imu();
     serial_mbot_motor_vel_t get_motor_vel();
     serial_twist2D_t get_robot_vel_goal();
-    void set_robot_vel_goal(float vx, float vy, float wz);
     serial_mbot_motor_vel_t get_motor_vel_goal();
-    void set_motor_vel_goal(float a, float b, float c);
     serial_mbot_motor_pwm_t get_motor_pwm();
-    void set_motor_pwm(float a, float b, float c);
     serial_pose2D_t get_odom();
+    serial_mbot_encoders_t get_encoders();
+    bool is_alive();
+
+    // Setters
+    void set_robot_vel_goal(float vx, float vy, float wz);
+    void set_motor_vel_goal(float a, float b, float c);
+    void set_motor_pwm(float a, float b, float c);
     void set_odom(float x, float y, float theta);
     void reset_odom();
-    serial_mbot_encoders_t get_encoders();
     void set_encoders(int a, int b, int c);
     void reset_encoders();
     void send_timesync();
 
-    static void start_server();
-
-    static void on_update(std::function<void(mbot*)> callback);
-
-    mac_address_t mac_address;
-    std::string name;
-    int is_alive;
+    // Static functions
+    static void set_verbose(bool state);
+    static void set_min_msg_rate(int rate);
+    static bool is_running();
+    static void start_server(uint16_t port = 9002);
+    static void set_on_update(std::function<void(mbot *)> callback);
+    static uint64_t get_time_us();
 
 private:
-
-    // Packet object
-    class packet_t
-    {
-    public:
-        packet_t();
-        packet_t(const packet_t &);
-        ~packet_t();
-        packet_t &operator=(const packet_t &other);
-        uint8_t *data;
-        uint8_t length;
-    };
-
     // Wrapper packet for serial data
-    struct __attribute__((__packed__)) packets_wrapper_t {
+    struct __attribute__((__packed__)) packets_wrapper_t
+    {
         serial_mbot_encoders_t encoders;
         serial_pose2D_t odom;
         serial_mbot_imu_t imu;
@@ -79,54 +79,95 @@ private:
         serial_mbot_motor_vel_t motor_vel;
         serial_mbot_motor_pwm_t motor_pwm;
     };
-    static std::string jsonify_packets_wrapper(mac_address_t mac_address, packets_wrapper_t *packets_wrapper);
 
+    // Packet object
+    class packet_t
+    {
+    public:
+        packet_t();
+        packet_t(size_t len);
+        packet_t(const packet_t &);
+        ~packet_t();
+        packet_t &operator=(const packet_t &);
+        uint8_t *data;
+        uint8_t len;
+    };
+
+    // Atomic variables for robot state
     std::atomic<serial_twist2D_t> robot_vel;
     std::atomic<serial_mbot_imu_t> imu;
     std::atomic<serial_mbot_motor_vel_t> motor_vel;
     std::atomic<serial_mbot_motor_pwm_t> motor_pwm;
     std::atomic<serial_pose2D_t> odom;
     std::atomic<serial_mbot_encoders_t> encoders;
+
+    // Goal state for the robot
     serial_twist2D_t robot_vel_goal;
     serial_mbot_motor_vel_t motor_vel_goal;
 
-    void update_mbot(packets_wrapper_t *pkt);
+    // Atomic flag to indicate if the robot is alive
+    std::atomic<bool> alive;
 
     // User defined callback function for update
-    std::function<void(mbot*)> update_cb;
+    static std::function<void(mbot *)> update_cb;
+    virtual void on_update();
+    virtual serial_pose2D_t get_functional_pose();
 
-    static std::string mac_to_string(const mac_address_t mac_address);                // converts mac_address_t to std::string
-    static void string_to_mac(const std::string &mac_str, mac_address_t mac_address); // converts mac_address_t to std::string
-    static std::unordered_map<std::string, mbot *> mbots;                             // contains pointers to all instatiated mbot objects
-
-    static std::atomic<int> num_mbots; // total  number of instatiated mbots
-
-    static std::atomic<bool> running; // set true on the first instatiated mbot object
-    static void recv_th();              // updates all instatiated mbot objects
-    static std::thread mbot_th_handle;
-    static int serial_port;
-
-    static void send_th(); // thread to send updates to host via serial
+    // Threads
     static std::thread send_th_handle;
-    static std::mutex send_mutex;
-    static std::queue<packet_t> send_queue; // queue containing packets to be sent
-    static std::condition_variable send_cv; // condition variable to waken the send thread
-
-    // Functions moved from comms.h
-    static void read_mac_address(uint8_t* mac_address, uint16_t* pkt_len);
-    static void read_message(uint8_t* data_serialized, uint16_t message_len, uint8_t* data_checksum);
-    static int validate_message(uint8_t* data_serialized, uint16_t message_len, uint8_t data_checksum);
-    static void encode_msg(uint8_t* msg, int msg_len, uint16_t topic, uint8_t mac_address[6], uint8_t* msg_ser, int msg_ser_len);
-    static uint8_t checksum(uint8_t* addends, int len);
-
-    // Server functions and members
-    static telemetry_server server;
-    static std::atomic<bool> server_running;
+    static std::thread mbot_th_handle;
     static std::thread server_th_handle;
 
-    // Other functions and members
+    // Mutexes and condition variables
+    static std::mutex update_cb_mutex;
+    static std::mutex send_mutex;
+    static std::condition_variable send_cv;
+
+    // Queue for packets to be sent
+    static std::queue<packet_t> send_queue;
+
+    // Server related variables
+    static telemetry_server server;
+    static std::atomic<bool> server_running;
+
+    // Time related variables and functions
     static std::atomic<uint64_t> start_time;
-    static uint64_t get_time_millis();
+
+    // Serial port
+    static void init_serial();
+    static int serial_port;
+
+    // MAC address in bytes
+    mac_address_t mac_bytes;
+
+    // Functions for updating robot state
+    void update_mbot(packets_wrapper_t *pkt);
+    static void reconnect();
+
+    // Static variables for thread states
+    static std::atomic<bool> verbose;
+    static std::atomic<int> num_mbots;
+    static std::atomic<bool> running;
+    static std::atomic<int> min_msg_rate;
+
+    // Map to store all instatiated mbot objects
+    static std::unordered_map<std::string, mbot *> mbots;
+
+    // Thread functions for receiving and sending data
+    static void recv_th();
+    static void send_th();
+
+    // Helper functions for encoding and decoding messages
+    static std::string jsonify_data(std::string mac_address, serial_pose2D_t odom);
+    static std::string mac_bytes_to_string(const mac_address_t mac_address);
+    static void mac_string_to_bytes(const std::string &mac_str, mac_address_t mac_address);
+    static void read_bytes(uint8_t *buffer, uint16_t len);
+    static void read_mac_address(uint8_t *mac_address, uint16_t *pkt_len);
+    static void read_message(uint8_t *data_serialized, uint16_t message_len, uint8_t *data_checksum);
+    static int validate_message(uint8_t *data_serialized, uint16_t message_len, uint8_t data_checksum);
+    template <typename T>
+    static void encode_msg(T *msg, uint16_t topic, mac_address_t mac_address, packet_t *pkt);
+    static uint8_t checksum(uint8_t *addends, int len);
 };
 
 #endif
