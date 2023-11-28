@@ -211,18 +211,8 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
 
-    // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&robot_vel_goal, MBOT_VEL_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    this->send_cv.notify_one();
+    // Serialize and send the message
+    encode_and_push_msg(&robot_vel_goal, MBOT_VEL_CMD, this->mac_bytes);
 }
 
 
@@ -235,17 +225,7 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     this->motor_vel_goal.velocity[2] = c;
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&motor_vel_goal, MBOT_MOTOR_VEL_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    this->send_cv.notify_one();
+    encode_and_push_msg(&motor_vel_goal, MBOT_MOTOR_VEL_CMD, this->mac_bytes);
 }
 
 
@@ -261,16 +241,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 
     // Serialize message and create packet
     packet_t packet;
-    encode_msg(&mbot_pwm, MBOT_MOTOR_PWM_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_pwm, MBOT_MOTOR_PWM_CMD, this->mac_bytes);
 }
 
 
@@ -285,16 +256,7 @@ void mbot::set_odom(float x, float y, float theta)
 
     // Serialize message and create packet
     packet_t packet;
-    encode_msg(&mbot_odom, MBOT_ODOMETRY_RESET, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_odom, MBOT_ODOMETRY_RESET, this->mac_bytes);
 }
 
 void mbot::reset_odom()
@@ -312,17 +274,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
     mbot_encoders.ticks[2] = c;
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&mbot_encoders, MBOT_ENCODERS_RESET, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_encoders, MBOT_ENCODERS_RESET, this->mac_bytes);
 }
 
 void mbot::reset_encoders()
@@ -339,17 +291,7 @@ void mbot::send_timesync()
     timestamp.utime = get_time_us() - start_time.load();
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&timestamp, MBOT_TIMESYNC, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&timestamp, MBOT_TIMESYNC, this->mac_bytes);
 }
 
 // Public static functions
@@ -747,34 +689,43 @@ int mbot::validate_message(uint8_t *data_serialized, uint16_t message_len, uint8
 }
 
 template <typename T>
-void mbot::encode_msg(T *msg, uint16_t topic, mac_address_t mac, packet_t *pkt)
+void mbot::encode_and_push_msg(T *msg, uint16_t topic, mac_address_t mac)
 {
     size_t msg_len = sizeof(T);
-    *pkt = packet_t(msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3);
+    packet_t pkt(msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3);
 
     // add mac address
-    pkt->data[0] = SYNC_FLAG;
-    pkt->data[1] = (uint8_t)((msg_len + ROS_PKG_LEN) % 255);
-    pkt->data[2] = (uint8_t)((msg_len + ROS_PKG_LEN) >> 8);
-    std::memcpy(pkt->data + 3, mac, MAC_ADDR_LEN);
+    pkt.data[0] = SYNC_FLAG;
+    pkt.data[1] = (uint8_t)((msg_len + ROS_PKG_LEN) % 255);
+    pkt.data[2] = (uint8_t)((msg_len + ROS_PKG_LEN) >> 8);
+    std::memcpy(pkt.data + 3, mac, MAC_ADDR_LEN);
 
     // add ROS packet header
-    pkt->data[9] = SYNC_FLAG;
-    pkt->data[10] = VERSION_FLAG;
-    pkt->data[11] = (uint8_t)(msg_len % 255);
-    pkt->data[12] = (uint8_t)(msg_len >> 8);
-    uint8_t cs1_addends[2] = {pkt->data[11], pkt->data[12]};
-    pkt->data[13] = checksum(cs1_addends, 2);
+    pkt.data[9] = SYNC_FLAG;
+    pkt.data[10] = VERSION_FLAG;
+    pkt.data[11] = (uint8_t)(msg_len % 255);
+    pkt.data[12] = (uint8_t)(msg_len >> 8);
+    uint8_t cs1_addends[2] = {pkt.data[11], pkt.data[12]};
+    pkt.data[13] = checksum(cs1_addends, 2);
 
     // add topic and message
-    pkt->data[14] = (uint8_t)(topic % 255);
-    pkt->data[15] = (uint8_t)(topic >> 8);
-    std::memcpy(pkt->data + 16, msg, msg_len);
+    pkt.data[14] = (uint8_t)(topic % 255);
+    pkt.data[15] = (uint8_t)(topic >> 8);
+    std::memcpy(pkt.data + 16, msg, msg_len);
     uint8_t cs2_addends[msg_len + 2];
-    cs2_addends[0] = pkt->data[14];
-    cs2_addends[1] = pkt->data[15];
+    cs2_addends[0] = pkt.data[14];
+    cs2_addends[1] = pkt.data[15];
     std::memcpy(cs2_addends + 2, (uint8_t *)msg, msg_len);
-    pkt->data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
+    pkt.data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
+
+    // add to the send queue
+    {
+        std::lock_guard<std::mutex> lock(send_mutex);
+        send_queue.push(pkt);
+    }
+
+    // alert the send thread there is work to do
+    send_cv.notify_one();
 }
 
 uint8_t mbot::checksum(uint8_t *addends, int len)

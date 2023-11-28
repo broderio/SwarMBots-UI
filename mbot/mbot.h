@@ -168,7 +168,7 @@ private:
     static void read_message(uint8_t *data_serialized, uint16_t message_len, uint8_t *data_checksum);
     static int validate_message(uint8_t *data_serialized, uint16_t message_len, uint8_t data_checksum);
     template <typename T>
-    static void encode_msg(T *msg, uint16_t topic, mac_address_t mac_address, packet_t *pkt);
+    static void encode_and_push_msg(T *msg, uint16_t topic, mac_address_t mac_address);
     static uint8_t checksum(uint8_t *addends, int len);
 };
 
