@@ -28,7 +28,6 @@ public:
 
         // Calculate the yaw rate from the IMU
         float dyaw_imu = curr_yaw - prev_yaw;
-        prev_yaw = curr_yaw;
         
         // Calculate the velocity in the space frame
         float vx_space = mbot_vel.vx * cos(odometry.theta) - mbot_vel.vy * sin(odometry.theta);
@@ -45,6 +44,8 @@ public:
         while (odometry.theta <= -M_PI) odometry.theta += 2 * M_PI;
 
         filtered_pose.store(odometry);
+        prev_yaw = curr_yaw;
+        prev_utime = mbot_vel.utime;
     }
     
     // Override the get_functional_pose virtual function to return the filtered pose to the GUI
