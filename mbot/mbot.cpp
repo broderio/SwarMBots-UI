@@ -192,6 +192,11 @@ serial_mbot_encoders_t mbot::get_encoders()
     return this->encoders.load();
 }
 
+int mbot::get_msg_rate()
+{
+    return this->msg_rate.load();
+}
+
 bool mbot::is_alive()
 {
     return alive.load();
@@ -617,7 +622,7 @@ void mbot::recv_th()
             {
                 // Get the robot pointer and message rate
                 mbot *mbot_ptr = mbots[msg_count.first];
-                int message_rate = msg_count.second;
+                int msg_rate = msg_count.second;
 
                 // Get the robot name and set the alive state
                 std::string name = mbot_ptr->name;
@@ -630,12 +635,13 @@ void mbot::recv_th()
                     state = false;
                 }
                 // Check if the message rate is too low
-                else if (message_rate < min_rate)
-                    std::cerr << "Warning: " << name << " sending at " << message_rate << " HZ (min rate: " << min_rate << " Hz)\n";
+                else if (msg_rate < min_rate)
+                    std::cerr << "Warning: " << name << " sending at " << msg_rate << " HZ (min rate: " << min_rate << " Hz)\n";
 
                 // Reset the message count and set the alive state
                 msg_count.second = 0;
                 mbot_ptr->alive.store(state);
+                mbot_ptr->msg_rate.store(msg_rate);
             }
         }
     }

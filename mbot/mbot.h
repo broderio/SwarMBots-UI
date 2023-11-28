@@ -48,6 +48,7 @@ public:
     serial_mbot_motor_pwm_t get_motor_pwm();
     serial_pose2D_t get_odom();
     serial_mbot_encoders_t get_encoders();
+    int get_msg_rate();
     bool is_alive();
 
     // Setters
@@ -107,6 +108,7 @@ private:
 
     // Atomic flag to indicate if the robot is alive
     std::atomic<bool> alive;
+    std::atomic<int> msg_rate;
 
     // User defined callback function for update
     static std::function<void(mbot *)> update_cb;
