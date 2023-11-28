@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     });
     sleep(15);
     mbot::set_on_update(nullptr);
-    std::cout << "Update rate: " << count / 15 << " Hz\n";
+    std::cout << "Update rate: " << count / 15.0 << " Hz\n";
 
     std::cout << "Measuring jitter...\n";
     std::vector<uint64_t> times;

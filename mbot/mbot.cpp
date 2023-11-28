@@ -543,7 +543,7 @@ void mbot::recv_th()
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
 
-        // If server is running, puiblish functional pose
+        // If server is running, publish functional pose
         if (server_running.load())
         {
             serial_pose2D_t odom = curr_mbot->get_functional_pose();
@@ -558,7 +558,6 @@ void mbot::recv_th()
         // Check if robot is alive
         if (curr_time + 1000000 < get_time_us())
         {
-            curr_time = get_time_us();
             int min_rate = mbot::min_msg_rate.load();
             for (auto &msg_count : msg_counts)
             {
@@ -585,6 +584,7 @@ void mbot::recv_th()
                 mbot_ptr->alive.store(state);
                 mbot_ptr->msg_rate.store(msg_rate);
             }
+            curr_time = get_time_us();
         }
     }
     log.close();
