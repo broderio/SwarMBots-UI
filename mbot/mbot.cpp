@@ -12,55 +12,6 @@
 
 #include "mbot.h"
 
-#ifndef B921600
-#define B921600 921600
-#endif
-
-// packet_t member function definitions
-
-// Default constructor
-mbot::packet_t::packet_t()
-{
-    data = nullptr;
-    len = 0;
-}
-
-// Constructor with length
-mbot::packet_t::packet_t(size_t len)
-{
-    data = new uint8_t[len];
-    this->len = len;
-}
-
-// Copy constructor
-mbot::packet_t::packet_t(const mbot::packet_t &other)
-{
-    this->data = new uint8_t[other.len];
-    std::memcpy(this->data, other.data, other.len);
-    this->len = other.len;
-}
-
-// Destructor
-mbot::packet_t::~packet_t()
-{
-    if (data != nullptr)
-    {
-        delete[] data;
-    }
-}
-
-// Assignment operator
-mbot::packet_t &mbot::packet_t::operator=(const mbot::packet_t &other)
-{
-    if (this != &other)
-    {
-        this->data = new uint8_t[other.len];
-        std::memcpy(this->data, other.data, other.len);
-        this->len = other.len;
-    }
-    return *this;
-}
-
 // mbot member function definitions
 
 // Static member variables
@@ -124,6 +75,22 @@ mbot::mbot(const std::string &name, const std::string &mac)
     this->send_timesync();
 }
 
+// Copy constructor
+mbot::mbot(const mbot &other)
+{
+    // Copy basic parameters
+    this->name = other.name;
+    this->mac = other.mac;
+    std::memcpy(this->mac_bytes, other.mac_bytes, MAC_ADDR_LEN);
+    this->alive.store(other.alive);
+
+    // Update map with new pointer
+    // Updating the map in this way means that only the most recent copy of an mbot
+    // will be updated by the recv_th thread. I think this is the best (maybe only?) way
+    // to handle this situation. If we used the original pointer, then it could be deleted
+    mbots[mac] = this;
+}
+
 // Destructor
 mbot::~mbot()
 {
@@ -147,22 +114,6 @@ mbot::~mbot()
         send_th_handle.join();
         mbot_th_handle.join();
     }
-}
-
-// Copy constructor
-mbot::mbot(const mbot &other)
-{
-    // Copy basic parameters
-    this->name = other.name;
-    this->mac = other.mac;
-    std::memcpy(this->mac_bytes, other.mac_bytes, MAC_ADDR_LEN);
-    this->alive.store(other.alive);
-
-    // Update map with new pointer
-    // Updating the map in this way means that only the most recent copy of an mbot
-    // will be updated by the recv_th thread. I think this is the best (maybe only?) way
-    // to handle this situation. If we used the original pointer, then it could be deleted
-    mbots[mac] = this;
 }
 
 // Initializer from file
@@ -200,33 +151,7 @@ std::vector<mbot> mbot::init_from_file(const std::string &file_name)
     return mbots;
 }
 
-// MAC address in bytes to string
-std::string mbot::mac_bytes_to_string(const mac_address_t mac)
-{
-    std::stringstream ss;
-    for (int i = 0; i < 6; ++i)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mac[i]);
-        if (i != 5)
-            ss << ':';
-    }
-    return ss.str();
-}
-
-// MAC address in string to bytes
-void mbot::mac_string_to_bytes(const std::string &mac_str, mac_address_t mac)
-{
-    std::stringstream ss(mac_str);
-    int i = 0;
-    while (ss.good() && i < 6)
-    {
-        std::string substr;
-        getline(ss, substr, ':');
-        mac[i] = std::stoi(substr, nullptr, 16);
-        i++;
-    }
-}
-
+// Getters
 serial_twist2D_t mbot::get_robot_vel()
 {
     return this->robot_vel.load();
@@ -267,6 +192,12 @@ serial_mbot_encoders_t mbot::get_encoders()
     return this->encoders.load();
 }
 
+bool mbot::is_alive()
+{
+    return alive.load();
+}
+
+// Setters
 void mbot::set_robot_vel_goal(float vx, float vy, float wz)
 {
     if (!alive || !running.load())
@@ -416,6 +347,7 @@ void mbot::send_timesync()
     send_cv.notify_one();
 }
 
+// Public static functions
 void mbot::set_verbose(bool state)
 {
     verbose.store(state);
@@ -426,20 +358,9 @@ void mbot::set_min_msg_rate(int rate)
     min_msg_rate.store(rate);
 }
 
-void mbot::set_on_update(std::function<void(mbot *)> callback)
-{
-    std::lock_guard<std::mutex> lock(update_cb_mutex);
-    update_cb = callback;
-}
-
 bool mbot::is_running()
 {
     return running.load();
-}
-
-bool mbot::is_alive()
-{
-    return alive.load();
 }
 
 void mbot::start_server(uint16_t port)
@@ -450,6 +371,60 @@ void mbot::start_server(uint16_t port)
                                              port));
 }
 
+void mbot::set_on_update(std::function<void(mbot *)> callback)
+{
+    std::lock_guard<std::mutex> lock(update_cb_mutex);
+    update_cb = callback;
+}
+
+// packet_t member function definitions
+
+// Default constructor
+mbot::packet_t::packet_t()
+{
+    data = nullptr;
+    len = 0;
+}
+
+// Constructor with length
+mbot::packet_t::packet_t(size_t len)
+{
+    data = new uint8_t[len];
+    this->len = len;
+}
+
+// Copy constructor
+mbot::packet_t::packet_t(const mbot::packet_t &other)
+{
+    this->data = new uint8_t[other.len];
+    std::memcpy(this->data, other.data, other.len);
+    this->len = other.len;
+}
+
+// Destructor
+mbot::packet_t::~packet_t()
+{
+    if (data != nullptr)
+    {
+        delete[] data;
+    }
+}
+
+// Assignment operator
+mbot::packet_t &mbot::packet_t::operator=(const mbot::packet_t &other)
+{
+    if (this != &other)
+    {
+        this->data = new uint8_t[other.len];
+        std::memcpy(this->data, other.data, other.len);
+        this->len = other.len;
+    }
+    return *this;
+}
+
+// mbot private member function definitions
+
+// Virtual functions
 void mbot::on_update()
 {
     // Do nothing
@@ -459,6 +434,7 @@ serial_pose2D_t mbot::get_functional_pose()
 {
     return get_odom();
 }
+
 
 void mbot::update_mbot(packets_wrapper_t *pkt)
 {
@@ -488,15 +464,250 @@ void mbot::reconnect()
     }
 }
 
-uint8_t mbot::checksum(uint8_t *addends, int len)
+uint64_t mbot::get_time_us()
 {
-    // takes in an array and sums the contents then checksums the array
-    int sum = 0;
-    for (int i = 0; i < len; i++)
+    auto currentTimePoint = std::chrono::high_resolution_clock::now();
+    auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint);
+    return (uint64_t)microsecondsSinceEpoch.time_since_epoch().count();
+}
+
+void mbot::init_serial()
+{
+    // Check if user defined port
+    if (port.empty())
     {
-        sum += addends[i];
+        // But for now print an error
+        perror("Error: No port specified.\n");
+        return;
     }
-    return 255 - ((sum) % 256);
+
+    // open com port host is connected to
+    struct termios tty;
+    serial_port = open(port.c_str(), O_RDWR);
+    if (serial_port == -1)
+    {
+        perror("Error: Unable to open serial port.\n");
+        return;
+    }
+
+    if (tcgetattr(serial_port, &tty) != 0)
+    {
+        perror("Error: Unable to get serial port attributes.\n");
+        return;
+    }
+
+    cfsetospeed(&tty, B921600); // Set output baud rate
+    cfsetispeed(&tty, B921600); // Set input baud rate
+
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Disable software flow control
+    tty.c_cflag |= (CLOCAL | CREAD);        // Ignore modem control lines, enable receiver
+    tty.c_cflag &= ~CSIZE;                  // Clear the size bits
+    tty.c_cflag |= CS8;                     // 8-bit data
+    tty.c_cflag &= ~PARENB;                 // No parity
+    tty.c_cflag &= ~CSTOPB;                 // 1 stop bit
+
+    tcflush(serial_port, TCIFLUSH);
+    if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
+    {
+        perror("Error from tcsetattr");
+        return;
+    }
+}
+
+// Reads all incoming data on USB
+void mbot::recv_th()
+{
+    std::ofstream log;
+    if (verbose.load())
+    {
+        log = std::ofstream("log.txt", std::ios::out);
+        if (!log.is_open())
+        {
+            std::cerr << "Error opening the log file!" << std::endl;
+            verbose.store(false);
+        }
+    }
+
+    std::unordered_map<std::string, int> msg_counts;
+    uint64_t curr_time = get_time_us();
+    while (running.load())
+    {
+        bool timeout = false;
+        size_t timeout_count = 0;
+        uint8_t trigger_val = 0x00;
+        std::vector<char> buffer; // Need to use vector becuase of null terminator in data
+
+        // Wait for the trigger byte, append all other valid ascii bytes to buffer
+        while (trigger_val != 0xff)
+        {
+            read(serial_port, &trigger_val, 1);
+            timeout_count++;
+
+            // Only append valid ascii characters
+            if (trigger_val > 0 && trigger_val < 128)
+                buffer.push_back(trigger_val);
+
+            if (timeout_count > 512)
+            {
+                timeout = true;
+                break;
+            }
+        }
+
+        // Convert buffer to string, log if verbose
+        std::string buf_str(buffer.begin(), buffer.end());
+        if (verbose.load())
+            log << buf_str << std::flush;
+
+        // Check if host crashed
+        if (buf_str.find("boot:") != std::string::npos)
+        {
+            std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
+            reconnect();
+            continue;
+        }
+
+        // Check if timeout
+        if (timeout)
+            continue;
+
+        // Read MAC address and packet length
+        mac_address_t mac;
+        uint8_t checksum_val;
+        uint16_t pkt_len;
+        read_mac_address(mac, &pkt_len);
+        if (pkt_len != 204)
+            continue;
+
+        // Read message and checksum
+        uint8_t msg_data_serialized[pkt_len];
+        uint8_t data_checksum = 0;
+        read_message(msg_data_serialized, pkt_len, &data_checksum);
+
+        // Validate message
+        if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
+            continue;
+
+        // Update the robot
+        std::string mac_str = mac_bytes_to_string(mac);
+        if (mbots.find(mac_str) == mbots.end())
+            continue;
+        mbot *curr_mbot = mbots[mac_str];
+        packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
+        curr_mbot->update_mbot(pkt_wrapped);
+
+        // If server is running, puiblish functional pose
+        if (server_running.load())
+        {
+            serial_pose2D_t odom = curr_mbot->get_functional_pose();
+            server.send_data(jsonify_data(curr_mbot->mac, odom));
+        }
+
+        // Update message counts
+        if (msg_counts.find(mac_str) == msg_counts.end())
+            msg_counts[mac_str] = 0;
+        msg_counts[mac_str]++;
+
+        // Check if robot is alive
+        if (curr_time + 1000000 < get_time_us())
+        {
+            curr_time = get_time_us();
+            int min_rate = mbot::min_msg_rate.load();
+            for (auto &msg_count : msg_counts)
+            {
+                // Get the robot pointer and message rate
+                mbot *mbot_ptr = mbots[msg_count.first];
+                int message_rate = msg_count.second;
+
+                // Get the robot name and set the alive state
+                std::string name = mbot_ptr->name;
+                bool state = true;
+
+                // Check if the robot is alive
+                if (msg_count.second == 0)
+                {
+                    std::cerr << "Error: " << name << " not sending messages.\n";
+                    state = false;
+                }
+                // Check if the message rate is too low
+                else if (message_rate < min_rate)
+                    std::cerr << "Warning: " << name << " sending at " << message_rate << " HZ (min rate: " << min_rate << " Hz)\n";
+
+                // Reset the message count and set the alive state
+                msg_count.second = 0;
+                mbot_ptr->alive.store(state);
+            }
+        }
+    }
+    log.close();
+    close(serial_port);
+}
+
+void mbot::send_th()
+{
+    while (running.load())
+    {
+        packet_t packet;
+        {
+            std::unique_lock<std::mutex> queue_lock(send_mutex);
+            while (send_queue.empty())
+            {
+                send_cv.wait(queue_lock);
+                if (!running.load())
+                    return;
+            }
+            packet = send_queue.front();
+            send_queue.pop();
+        }
+
+        ssize_t bytes_written = write(serial_port, packet.data, packet.len);
+        if (bytes_written < 0)
+        {
+            perror("Error writing to serial port");
+            continue;
+        }
+    }
+}
+
+// Helper functions for encoding and decoding messages
+std::string mbot::jsonify_data(std::string mac, serial_pose2D_t odom)
+{
+    std::ostringstream oss;
+    oss << "{"
+        << "\"mac\":\"" << mac << "\","
+        << "\"x\":" << odom.x << ","
+        << "\"y\":" << odom.y << ","
+        << "\"theta\":" << odom.theta
+        << "}";
+
+    return oss.str();
+}
+
+// MAC address in bytes to string
+std::string mbot::mac_bytes_to_string(const mac_address_t mac)
+{
+    std::stringstream ss;
+    for (int i = 0; i < 6; ++i)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mac[i]);
+        if (i != 5)
+            ss << ':';
+    }
+    return ss.str();
+}
+
+// MAC address in string to bytes
+void mbot::mac_string_to_bytes(const std::string &mac_str, mac_address_t mac)
+{
+    std::stringstream ss(mac_str);
+    int i = 0;
+    while (ss.good() && i < 6)
+    {
+        std::string substr;
+        getline(ss, substr, ':');
+        mac[i] = std::stoi(substr, nullptr, 16);
+        i++;
+    }
 }
 
 void mbot::read_bytes(uint8_t *buffer, uint16_t len)
@@ -560,221 +771,13 @@ void mbot::encode_msg(T *msg, uint16_t topic, mac_address_t mac, packet_t *pkt)
     pkt->data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
 }
 
-uint64_t mbot::get_time_us()
+uint8_t mbot::checksum(uint8_t *addends, int len)
 {
-    auto currentTimePoint = std::chrono::high_resolution_clock::now();
-    auto microsecondsSinceEpoch = std::chrono::time_point_cast<std::chrono::microseconds>(currentTimePoint);
-    return (uint64_t)microsecondsSinceEpoch.time_since_epoch().count();
-}
-
-std::string mbot::jsonify_data(std::string mac, serial_pose2D_t odom)
-{
-    std::ostringstream oss;
-    oss << "{"
-        << "\"mac\":\"" << mac << "\","
-        << "\"x\":" << odom.x << ","
-        << "\"y\":" << odom.y << ","
-        << "\"theta\":" << odom.theta
-        << "}";
-
-    return oss.str();
-}
-
-void mbot::init_serial()
-{
-    // Check if user defined port
-    if (port.empty())
+    // takes in an array and sums the contents then checksums the array
+    int sum = 0;
+    for (int i = 0; i < len; i++)
     {
-        // But for now print an error
-        perror("Error: No port specified.\n");
-        return;
+        sum += addends[i];
     }
-
-    // open com port host is connected to
-    struct termios tty;
-    serial_port = open(port.c_str(), O_RDWR);
-    if (serial_port == -1)
-    {
-        perror("Error opening serial port.\n");
-        return;
-    }
-
-    memset(&tty, 0, sizeof tty);
-
-    if (tcgetattr(serial_port, &tty) != 0)
-    {
-        perror("Error from tcgetattr.");
-        return;
-    }
-
-    cfsetospeed(&tty, B921600); // Set output baud rate
-    cfsetispeed(&tty, B921600); // Set input baud rate
-
-    tty.c_cflag |= (CLOCAL | CREAD);        // Ignore modem control lines, enable receiver
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Disable software flow control
-    tty.c_cflag &= ~CSIZE;                  // Clear the size bits
-    tty.c_cflag |= CS8;                     // 8-bit data
-    tty.c_cflag &= ~PARENB;                 // No parity
-    tty.c_cflag &= ~CSTOPB;                 // 1 stop bit
-
-    tcflush(serial_port, TCIFLUSH);
-    if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
-    {
-        perror("Error from tcsetattr");
-        return;
-    }
-}
-
-// Reads all incoming data on USB
-void mbot::recv_th()
-{
-    std::ofstream outputFile;
-    if (verbose.load())
-    {
-        outputFile = std::ofstream("log.txt", std::ios::out);
-        if (!outputFile.is_open())
-        {
-            std::cerr << "Error opening the log file!" << std::endl;
-            verbose.store(false);
-        }
-    }
-
-    std::unordered_map<std::string, int> msg_counts;
-    uint64_t curr_time = get_time_us();
-    while (running.load())
-    {
-        bool timeout = false;
-        size_t timeout_count = 0;
-        uint8_t trigger_val = 0x00;
-        std::vector<char> buffer; // Need to use vector becuase of null terminator in data
-
-        // Wait for the trigger byte, append all other valid ascii bytes to buffer
-        while (trigger_val != 0xff)
-        {
-            read(serial_port, &trigger_val, 1);
-            timeout_count++;
-
-            // Only append valid ascii characters
-            if (trigger_val > 0 && trigger_val < 128)
-                buffer.push_back(trigger_val);
-
-            if (timeout_count > 512)
-            {
-                timeout = true;
-                break;
-            }
-        }
-
-        // Convert buffer to string, log if verbose
-        std::string buf_str(buffer.begin(), buffer.end());
-        if (verbose.load())
-            outputFile << buf_str << std::flush;
-
-        // Check if host crashed
-        if (buf_str.find("boot:") != std::string::npos)
-        {
-            std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
-            reconnect();
-        }
-
-        // Check if timeout
-        if (timeout)
-            continue;
-
-        // Read MAC address and packet length
-        mac_address_t mac;
-        uint8_t checksum_val;
-        uint16_t pkt_len;
-        read_mac_address(mac, &pkt_len);
-        if (pkt_len != 204)
-            continue;
-
-        // Read message and checksum
-        uint8_t msg_data_serialized[pkt_len];
-        uint8_t data_checksum = 0;
-        read_message(msg_data_serialized, pkt_len, &data_checksum);
-
-        // Validate message
-        if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
-            continue;
-
-        // Update the robot
-        std::string mac_str = mac_bytes_to_string(mac);
-        if (mbots.find(mac_str) == mbots.end())
-            continue;
-        mbot *curr_mbot = mbots[mac_str];
-        packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
-        curr_mbot->update_mbot(pkt_wrapped);
-
-        // If server is running, puiblish functional pose
-        if (server_running.load())
-        {
-            serial_pose2D_t odom = curr_mbot->get_functional_pose();
-            server.send_data(jsonify_data(curr_mbot->mac, odom));
-        }
-
-        // Update message counts
-        if (msg_counts.find(mac_str) == msg_counts.end())
-            msg_counts[mac_str] = 0;
-        msg_counts[mac_str]++;
-
-        // Check if robot is alive
-        if (curr_time + 1000000 < get_time_us())
-        {
-            curr_time = get_time_us();
-            int min_rate = mbot::min_msg_rate.load();
-            for (auto &msg_count : msg_counts)
-            {
-                // Get the robot pointer and message rate
-                mbot *mbot_ptr = mbots[msg_count.first];
-                int message_rate = msg_count.second;
-
-                // Get the robot name and set the alive state
-                std::string name = mbot_ptr->name;
-                bool state = true;
-
-                // Check if the robot is alive
-                if (msg_count.second == 0)
-                {
-                    std::cerr << "Warning: " << name << " not sending messages.\n";
-                    state = false;
-                }
-                // Check if the message rate is too low
-                else if (message_rate < min_rate)
-                    std::cerr << "Warning: " << name << " sending at " << message_rate << " HZ (min rate: " << min_rate << " Hz)\n";
-
-                // Reset the message count and set the alive state
-                msg_count.second = 0;
-                mbot_ptr->alive.store(state);
-            }
-        }
-    }
-    outputFile.close();
-    close(serial_port);
-}
-
-void mbot::send_th()
-{
-    while (running.load())
-    {
-        packet_t packet;
-        {
-            std::unique_lock<std::mutex> queue_lock(send_mutex);
-            while (send_queue.empty())
-            {
-                send_cv.wait(queue_lock);
-                if (!running.load())
-                    return;
-            }
-            packet = send_queue.front();
-            send_queue.pop();
-        }
-
-        ssize_t bytes_written = write(serial_port, packet.data, packet.len);
-        if (bytes_written < 0)
-        {
-            perror("Error writing to serial port");
-            continue;
-        }
-    }
+    return 255 - ((sum) % 256);
 }

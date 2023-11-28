@@ -7,4 +7,8 @@ fi
 cmake -S . -B build/
 
 # Compile and link
-cmake --build build/ --target all -- -j 4
+if [ -z "$1" ]; then
+  cmake --build build/ --target all -- -j 4
+else
+  cmake --build build/ --target $1 -- -j 4
+fi

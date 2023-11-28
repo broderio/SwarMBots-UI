@@ -71,7 +71,7 @@
 
         // Define size variables for the canvas
         var dim = 600;
-        var pixels_per_meter = 200;
+        var pixels_per_meter = 150;
         var grid_offset = 10;
         var center = dim / 2;
         var actual_dim = dim + 2 * grid_offset;
@@ -80,13 +80,13 @@
         var major_line_width = 2;
         var minor_line_width = 1;
         var major_lines_per_meter = 1;
-        var minor_lines_per_meter = 4;
+        var minor_lines_per_meter = 2;
         var major_line_color = colors["black"];
         var minor_line_color = colors["gray"];
 
         // Define size variables for the mbot
-        var rad = 15; // 3 inches = 7.62 cm ~ 15 pixels
-        var dotRad = 5;
+        var rad = Math.round(0.08255 * pixels_per_meter); // 3.25 inches ~ 0.08255 meters
+        var dotRad = 3;
 
         var app = new PIXI.Application({ width: actual_dim, height: actual_dim, backgroundColor: 0xFFFFFF });
         document.getElementById("pixi-container").appendChild(app.view);
