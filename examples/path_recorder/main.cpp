@@ -7,19 +7,18 @@
 volatile sig_atomic_t flag = 1;
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <serial_port> <mac_file_path> <path_file_path>\n";
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <path_file_path>\n";
         return 1;
     }
     std::string port = argv[1];
-    std::string mac_file_path = argv[2];
-    std::string path_file_path = argv[3];
+    std::string path_file_path = argv[2];
 
     // Set serial port
-    mbot::port = port;
+    mbot::init(port);
 
     // Get mac address
-    std::ifstream macs(mac_file_path);
+    std::ifstream macs("macs.txt");
     std::string mac_str;
     std::getline(macs, mac_str);
     std::cout << "Mac address: " << mac_str << "\n";

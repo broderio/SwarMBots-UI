@@ -30,14 +30,11 @@ public:
     mbot(const std::string &name, const std::string &mac);
     mbot(const mbot &);
     ~mbot();
-    static std::vector<mbot> init_from_file(const std::string &file_name = "macs.txt");
+    static void init(const std::string &port);
 
     // Public member variables
     std::string mac;
     std::string name;
-
-    // Public static variables
-    static std::string port;
 
     // Getters
     serial_twist2D_t get_robot_vel();
@@ -64,6 +61,7 @@ public:
     // Static functions
     static void set_verbose(bool state);
     static void set_min_msg_rate(int rate);
+    static void set_fast(bool state);
     static bool is_running();
     static void start_server(uint16_t port = 9002);
     static void set_on_update(std::function<void(mbot *)> callback);
@@ -109,6 +107,7 @@ private:
     // Atomic flag to indicate if the robot is alive
     std::atomic<bool> alive;
     std::atomic<int> msg_rate;
+    static bool initialized;
 
     // User defined callback function for update
     static std::function<void(mbot *)> update_cb;
@@ -137,6 +136,7 @@ private:
 
     // Serial port
     static void init_serial();
+    static std::string port;
     static int serial_port;
 
     // MAC address in bytes
@@ -151,6 +151,7 @@ private:
     static std::atomic<int> num_mbots;
     static std::atomic<bool> running;
     static std::atomic<int> min_msg_rate;
+    static std::atomic<bool> fast;
 
     // Map to store all instatiated mbot objects
     static std::unordered_map<std::string, mbot *> mbots;
@@ -171,5 +172,42 @@ private:
     static void encode_and_push_msg(T *msg, uint16_t topic, mac_address_t mac_address);
     static uint8_t checksum(uint8_t *addends, int len);
 };
+
+std::vector<std::string> get_macs_from_file(const std::string &file_name);
+
+template<typename T=mbot, typename... Args>
+std::vector<T> init_from_file(const std::string & file_name, Args&&... args)
+{
+    // Given a file with a list of MAC addresses, return an array of mbots
+    std::ifstream file(file_name);
+    if (!file.is_open())
+    {
+        perror("Error opening MAC address file. Ensure specified path is correct.\n");
+        return std::vector<T>();
+    }
+    std::string line;
+
+    // Read the file and get the number of bots and the mac addresses
+    int num_bots = 0;
+    std::vector<std::string> macs;
+    while (std::getline(file, line))
+    {
+        if (line[0] == '#')
+            continue;
+        macs.push_back(line);
+        num_bots++;
+    }
+
+    // Create the mbots
+    std::vector<T> mbots;
+    mbots.reserve(num_bots);
+    for (int i = 0; i < num_bots; i++)
+    {
+        std::string name = "mbot-" + std::to_string(i);
+        mbots.emplace_back(name, macs[i], std::forward<Args>(args)...);
+    }
+
+    return mbots;
+}
 
 #endif

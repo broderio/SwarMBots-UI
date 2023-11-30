@@ -18,12 +18,14 @@
 std::atomic<bool> mbot::running(false);
 std::atomic<bool> mbot::server_running(false);
 std::atomic<int> mbot::min_msg_rate(15);
+std::atomic<bool> mbot::fast(false);
 std::atomic<bool> mbot::verbose(false);
 std::atomic<int> mbot::num_mbots;
 std::atomic<uint64_t> mbot::start_time;
 
 std::string mbot::port;
 int mbot::serial_port;
+bool mbot::initialized = false;
 
 std::unordered_map<std::string, mbot *> mbot::mbots;
 std::queue<mbot::packet_t> mbot::send_queue;
@@ -43,6 +45,11 @@ std::condition_variable mbot::send_cv;
 // Contructor
 mbot::mbot(const std::string &name, const std::string &mac)
 {
+    if (!mbot::initialized)
+    {
+        throw(std::runtime_error("mbot not initialized, please call mbot::init before instantiating mbot objects"));
+    }
+
     this->name = name;
     this->alive = true;
     this->mac = mac;
@@ -116,39 +123,10 @@ mbot::~mbot()
     }
 }
 
-// Initializer from file
-std::vector<mbot> mbot::init_from_file(const std::string &file_name)
+void mbot::init(const std::string &port)
 {
-    // Given a file with a list of MAC addresses, return an array of mbots
-    std::ifstream file(file_name);
-    if (!file.is_open())
-    {
-        perror("Error opening MAC address file. Ensure specified path is correct.\n");
-        return std::vector<mbot>();
-    }
-    std::string line;
-
-    // Read the file and get the number of bots and the mac addresses
-    int num_bots = 0;
-    std::vector<std::string> macs;
-    while (std::getline(file, line))
-    {
-        if (line[0] == '#')
-            continue;
-        macs.push_back(line);
-        num_bots++;
-    }
-
-    // Create the mbots
-    std::vector<mbot> mbots;
-    mbots.reserve(num_bots);
-    for (int i = 0; i < num_bots; i++)
-    {
-        std::string name = "mbot-" + std::to_string(i);
-        mbots.emplace_back(name, macs[i]);
-    }
-
-    return mbots;
+    mbot::port = port;
+    mbot::initialized = true;
 }
 
 // Getters
@@ -261,7 +239,7 @@ void mbot::set_odom(float x, float y, float theta)
 
 void mbot::reset_odom()
 {
-    set_encoders(0, 0, 0);
+    set_odom(0, 0, 0);
 }
 
 void mbot::set_encoders(int a, int b, int c = 0)
@@ -303,6 +281,11 @@ void mbot::set_verbose(bool state)
 void mbot::set_min_msg_rate(int rate)
 {
     min_msg_rate.store(rate);
+}
+
+void mbot::set_fast(bool state) 
+{
+    fast.store(state);
 }
 
 bool mbot::is_running()
@@ -479,6 +462,7 @@ void mbot::recv_th()
     uint64_t curr_time = get_time_us();
     while (running.load())
     {
+        bool is_fast = fast.load();
         bool timeout = false;
         size_t timeout_count = 0;
         uint8_t trigger_val = 0x00;
@@ -488,9 +472,11 @@ void mbot::recv_th()
         while (trigger_val != 0xff)
         {
             read(serial_port, &trigger_val, 1);
-            timeout_count++;
+            if (is_fast)
+                continue;
 
             // Only append valid ascii characters
+            timeout_count++;
             if (trigger_val > 0 && trigger_val < 128)
                 buffer.push_back(trigger_val);
 
@@ -501,22 +487,24 @@ void mbot::recv_th()
             }
         }
 
-        // Convert buffer to string, log if verbose
-        std::string buf_str(buffer.begin(), buffer.end());
-        if (verbose.load())
-            log << buf_str << std::flush;
+        if (!is_fast) {
+            // Convert buffer to string, log if verbose
+            std::string buf_str(buffer.begin(), buffer.end());
+            if (verbose.load())
+                log << buf_str << std::flush;
 
-        // Check if host crashed
-        if (buf_str.find("boot:") != std::string::npos)
-        {
-            std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
-            reconnect();
-            continue;
+            // Check if host crashed
+            if (buf_str.find("bootloader") != std::string::npos)
+            {
+                std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
+                reconnect();
+                continue;
+            }
+            // Check if timeout
+            if (timeout)
+                continue;
         }
 
-        // Check if timeout
-        if (timeout)
-            continue;
 
         // Read MAC address and packet length
         mac_address_t mac;
@@ -549,6 +537,9 @@ void mbot::recv_th()
             serial_pose2D_t odom = curr_mbot->get_functional_pose();
             server.send_data(jsonify_data(curr_mbot->mac, odom));
         }
+
+        if (is_fast)
+            continue;
 
         // Update message counts
         if (msg_counts.find(mac_str) == msg_counts.end())
@@ -737,4 +728,23 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
         sum += addends[i];
     }
     return 255 - ((sum) % 256);
+}
+
+std::vector<std::string> get_macs_from_file(const std::string &file_name)
+{
+    std::vector<std::string> macs;
+    std::ifstream file(file_name);
+    if (!file.is_open())
+    {
+        std::cerr << "Error opening file: " << file_name << std::endl;
+        return macs;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        macs.push_back(line);
+    }
+    file.close();
+    return macs;
 }

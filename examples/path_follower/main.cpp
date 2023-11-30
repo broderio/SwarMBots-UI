@@ -8,30 +8,30 @@
 #include "path_follower.h"
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <serial_port> <mac_file_path> <path_file_path>\n";
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <serial_port> <path_file_path>\n";
         return 1;
     }
     std::string port = argv[1];
-    std::string mac_file_path = argv[2];
-    std::string path_file_path = argv[3];
+    std::string path_file_path = argv[2];
 
     // Set serial port
-    mbot::port = port;
+    mbot::init(port);
 
     // Get mac address
-    std::ifstream macs(mac_file_path);
+    std::ifstream macs("macs.txt");
     std::string mac_str;
     std::getline(macs, mac_str);
     std::cout << "Mac address: " << mac_str << "\n";
     macs.close();
 
     // Create mbot object and start server
-    path_follower m("mbot", mac_str, 1.2, 0.08);
+    path_follower m("mbot", mac_str, 1.2, 0.1 );
+    while (m.get_odom().x != 0.0) {
+        m.reset_odom();
+        usleep(100000);
+    }
     path_follower::start_server();
-    m.reset_odom();
-    m.reset_encoders();
-    usleep(1000000); // Wait for odometry to reset
     std::signal(SIGINT, [](int signum) {
         flag = 0;
     });

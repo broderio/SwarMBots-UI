@@ -13,8 +13,8 @@ int main(int argc, char *argv[]) {
     std::string port = argv[1];
 
     // Create mbot object
-    mbot::port = port;
-    std::vector<mbot> mbots = mbot::init_from_file();
+    mbot::init(port);
+    std::vector<mbot> mbots = init_from_file<mbot>("macs.txt");
     mbot::set_verbose(true);
     mbot m = mbots[0];
     

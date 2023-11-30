@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     }
     std::string port = argv[1];
 
-    comp_filter::port = port;
+    comp_filter::init(port);
     comp_filter cf("mbot-0", "ec:da:3b:46:83:05", 0.98);
     cf.reset_odom();
     cf.reset_encoders();
