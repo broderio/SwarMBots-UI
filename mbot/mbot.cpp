@@ -56,7 +56,7 @@ mbot::mbot(const std::string &name, const std::string &mac)
     mac_string_to_bytes(mac, mac_bytes);
 
     // Add the robot to the swarm
-    mbots.insert(std::pair<std::string, mbot *>(mac, this));
+    mbots.insert(std::pair<std::string, mbot *>(this->mac, this));
 
     // Increment the number of robots
     num_mbots++;
@@ -65,7 +65,6 @@ mbot::mbot(const std::string &name, const std::string &mac)
     if (!running.load() && num_mbots.load() == 1)
     {
         running.store(true);
-        verbose.store(false);
 
         // Set start time for timesync offset
         start_time.store(get_time_us());
@@ -447,6 +446,7 @@ void mbot::init_serial()
 // Reads all incoming data on USB
 void mbot::recv_th()
 {
+    
     std::ofstream log;
     if (verbose.load())
     {
@@ -505,7 +505,6 @@ void mbot::recv_th()
                 continue;
         }
 
-
         // Read MAC address and packet length
         mac_address_t mac;
         uint8_t checksum_val;
@@ -523,6 +522,8 @@ void mbot::recv_th()
         if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
             continue;
 
+        
+
         // Update the robot
         std::string mac_str = mac_bytes_to_string(mac);
         if (mbots.find(mac_str) == mbots.end())
@@ -531,10 +532,13 @@ void mbot::recv_th()
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
 
+
+
         // If server is running, publish functional pose
         if (server_running.load())
         {
             serial_pose2D_t odom = curr_mbot->get_functional_pose();
+            std::cout << "publishing odom x: " << odom.x << "\n";
             server.send_data(jsonify_data(curr_mbot->mac, odom));
         }
 
@@ -584,6 +588,7 @@ void mbot::recv_th()
 
 void mbot::send_th()
 {
+
     while (running.load())
     {
         packet_t packet;

@@ -194,7 +194,7 @@ std::vector<T> init_from_file(const std::string & file_name, Args&&... args)
     {
         if (line[0] == '#')
             continue;
-        macs.push_back(line);
+        macs.push_back(line.substr(0, 17));
         num_bots++;
     }
 
