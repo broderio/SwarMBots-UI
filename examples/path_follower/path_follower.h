@@ -13,10 +13,19 @@ public:
         for (std::string line; std::getline(path_file, line);) {
             std::istringstream iss(line);
             serial_pose2D_t goal_pose;
-            if (!(iss >> goal_pose.utime >> goal_pose.x >> goal_pose.y >> goal_pose.theta)) {
+
+            int64_t utime;
+            float x, y, theta;
+            if (!(iss >> utime >> x >> y >> theta)) {
                 std::cerr << "Error reading path file\n";
                 exit(1);
             }
+
+            goal_pose.utime = utime;
+            goal_pose.x = x;
+            goal_pose.y = y;
+            goal_pose.theta = theta;
+            
             path.push(goal_pose);
         }
         std::cout << "Path size: " << path.size() << "\n";

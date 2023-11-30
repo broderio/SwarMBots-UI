@@ -14,6 +14,8 @@ int main(int argc, char *argv[]) {
 
     // Create mbot object
     mbot::init(port);
+    mbot::set_verbose(true);
+    
     std::vector<mbot> mbots = init_from_file<mbot>("macs.txt");
     
     // mbots[0].set_odom(0, 0.5, 0);
@@ -25,5 +27,6 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         sleep(1);
+        std::cout << "Odom: " << mbots[0].get_odom().x << "\n";
     }
 }
