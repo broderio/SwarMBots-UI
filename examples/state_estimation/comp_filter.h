@@ -11,6 +11,10 @@ public:
         prev_utime = 0;
     }
 
+    void set_filtered_pose(float x, float y, float theta) {
+        filtered_pose.store({0, x, y, theta});
+    }
+
     serial_pose2D_t get_filtered_pose() {
         return filtered_pose.load();
     }
