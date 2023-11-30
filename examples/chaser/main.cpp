@@ -8,46 +8,34 @@
 #include "mbot.h"
 #include "chaser.h"
 
+/*
+*   This example demonstrates how to use the chaser class to make a robot follow another robot.
+*   Place the robots into a triangle configuration with robot 0 at the top, robot 1 at the
+*   bottom right, and robot 2 at the bottom left. Robot 0 will follow robot 1, robot 1 will
+*   follow robot 2, and robot 2 will follow robot 0. Each robot should be oriented to look at
+*   the robot it is following.
+*/
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <serial_port> \n";
         return 1;
     }
     std::string port = argv[1];
-    std::string path_file_path = argv[3];
 
     // Set serial port
     mbot::init(port);
 
     // Set fast mode
-    // chaser::set_fast(true);
-
-    // Get mac addresses
-    std::vector<std::string> macs = get_macs_from_file("macs.txt");
-
-    // Create mbot object
-    mbot m("mbot", macs[0]);
+    chaser::set_fast(true);
 
     // Create chaser objects
-    chaser c1("chaser-1", macs[1], 0.5, 0.05);
-    // chaser c2("chaser-2", macs[2], 0.25, 0.05);
+    std::vector<chaser> chasers = init_from_file<chaser>("macs.txt", 0.5, 0.05);
 
-    usleep(1000000); // Wait for odometry to reset
-    
-    float x = m.get_odom().x;
-    while (x != 0.0) {
-        m.reset_odom();
-        usleep(100000);
-        std::cout << x << '\n';
-        x = m.get_odom().x;
-    }
-
-    while (c1.get_odom().x != -0.5) {
-        c1.set_odom(-0.5, 0.0, 0.0);
-        usleep(100000);
-    }
-    // c2.set_odom(-0.5, -0.25, 0.0);
-    usleep(1000000); // Wait for odometry to reset
+    // Initialize robots into an equilateral triangle centered at the origin
+    chasers[0].set_odom(0, 0.5, -M_PI / 3.0);
+    chasers[1].set_odom(0.5 * sqrt(3) / 2, -0.25, -M_PI);
+    chasers[2].set_odom(-0.5 * sqrt(3) / 2, -0.25, M_PI / 3.0);
 
     chaser::start_server();
 
@@ -57,25 +45,29 @@ int main(int argc, char *argv[]) {
 
     // Record odometry until user presses enter
     std::cout << "Chaser!\n";
-    std::cout << "Put host into serial mode ...\n";
-    std::cout << "Press enter to start driving\n";
+    std::cout << "Put host into serial mode and press enter to begin \n";
     std::cin.get();
-    std::cout << "Driving along path ...\n";
     std::cout << "Press ctrl-c to stop\n";
 
+    // Init goal poses
+    chasers[0].set_goal_pose(chasers[1].get_odom());
+    chasers[1].set_goal_pose(chasers[2].get_odom());
+    chasers[2].set_goal_pose(chasers[0].get_odom());
+
+    // Start following
+    for (chaser &c : chasers) {
+        c.set_ready(true);
+    }
+
     // Follow path
-    serial_pose2D_t goal = m.get_odom();
-    c1.set_goal_pose(goal);
-    c1.set_ready(true);
-    // c2.set_goal_pose(goal);
     while (flag) {
-        m.set_robot_vel_goal(0.12, 0.0, -0.28);
-        goal = m.get_odom();
-        c1.set_goal_pose(goal);
-        // c2.set_goal_pose(goal);
+        for (int i = 0; i < 3; i++) {
+            int j = (i + 1) % 3;
+            serial_pose2D_t goal = chasers[j].get_odom();
+            chasers[i].set_goal_pose(goal);
+        }
         usleep(100000);
     }
-    m.set_robot_vel_goal(0.0, 0.0, 0.0);
     std::cout << "Done following!\n";
     exit(0);
 }

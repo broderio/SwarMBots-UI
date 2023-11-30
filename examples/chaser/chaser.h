@@ -7,6 +7,13 @@ public:
     chaser(const std::string &name, const std::string &mac_str, float Kp, float Ki)
      : mbot(name, mac_str), Kp(Kp), Ki(Ki) {}
 
+    chaser(const chaser &other)
+     : mbot(other), Kp(other.Kp), Ki(other.Ki) {
+        error_sum.store(other.error_sum.load());
+        goal_pose.store(other.goal_pose.load());
+        ready.store(other.ready.load());
+     }
+
     void set_goal_pose(serial_pose2D_t goal) {
         goal_pose.store(goal);
         error_sum.store(0);

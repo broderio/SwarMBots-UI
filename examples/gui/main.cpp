@@ -2,8 +2,16 @@
 #include <vector>
 #include <unistd.h>
 #include <fstream>
+#include <cmath>
 
 #include "mbot.h"
+
+/*
+*   This example is a simple demo of the GUI. The robots are meant to be piloted
+*   using the controller. The GUI can be accessed by opening gui.html in your 
+*   browser. The robots should be placed 0.5m apart with robot 1 in the middle.
+*   The robots' heading should be +90 degrees (facing the +y direction)
+*/
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -17,16 +25,18 @@ int main(int argc, char *argv[]) {
     mbot::set_verbose(true);
     
     std::vector<mbot> mbots = init_from_file<mbot>("macs.txt");
-    
-    // mbots[0].set_odom(0, 0.5, 0);
-    mbots[0].reset_odom();
-    mbots[0].reset_encoders();
-    // mbots[2].set_odom(0, -0.5, 0);
+    usleep(1000000); // Sleep for 1s
+
+    float x = -0.5;
+    for (mbot &m : mbots) {
+        m.set_odom(x, 0.0, M_PI / 2.0);
+        m.reset_encoders();
+        x += 0.5;
+    }
 
     mbot::start_server();
 
     while (1) {
         sleep(1);
-        std::cout << "Odom: " << mbots[0].get_odom().x << "\n";
     }
 }
