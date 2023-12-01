@@ -48,6 +48,7 @@ public:
         float w = curvature * v;
 
         if (v > 0.1) v = 0.1;
+
         // std::cout << "lookahead_dist: " << lookahead_dist << ", lookahead_theta: " << lookahead_theta << "\n";
         // std::cout << "v: " << v << ", w: " << w << "\n";
 

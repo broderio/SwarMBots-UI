@@ -538,8 +538,7 @@ void mbot::recv_th()
         if (server_running.load())
         {
             serial_pose2D_t odom = curr_mbot->get_functional_pose();
-            std::cout << "publishing odom x: " << odom.x << "\n";
-            server.send_data(jsonify_data(curr_mbot->mac, odom));
+            server.send_data(jsonify_data(curr_mbot->name, odom));
         }
 
         if (is_fast)

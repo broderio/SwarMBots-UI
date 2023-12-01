@@ -33,9 +33,9 @@ int main(int argc, char *argv[]) {
     std::vector<chaser> chasers = init_from_file<chaser>("macs.txt", 0.5, 0.05);
 
     // Initialize robots into an equilateral triangle centered at the origin
-    chasers[0].set_odom(0, 0.5, -M_PI / 3.0);
-    chasers[1].set_odom(0.5 * sqrt(3) / 2, -0.25, -M_PI);
-    chasers[2].set_odom(-0.5 * sqrt(3) / 2, -0.25, M_PI / 3.0);
+    chasers[0].set_odom(0.0, 0.5, M_PI);
+    chasers[1].set_odom(-0.5, -0.5, 0.0);
+    chasers[2].set_odom(0.5, -0.5, M_PI / 2.0);
 
     chaser::start_server();
 
