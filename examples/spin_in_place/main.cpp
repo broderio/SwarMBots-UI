@@ -9,9 +9,9 @@ int main(int argc, char *argv[]) {
     }
     std::string port = argv[1];
 
-    mbot::port = port;
+    mbot::init(port);
 
-    std::vector<mbot> mbot_list = mbot::init_from_file();
+    std::vector<mbot> mbot_list = init_from_file("macs.txt");
     while(1){
         std::cout << "Turning right\n";
         for (mbot &m : mbot_list) {

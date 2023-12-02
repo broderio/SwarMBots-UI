@@ -11,6 +11,20 @@ public:
         prev_utime = 0;
     }
 
+    void set_filtered_pose(float x, float y, float theta) {
+        filtered_pose.store({0, x, y, theta});
+    }
+
+    serial_pose2D_t get_filtered_pose() {
+        return filtered_pose.load();
+    }
+
+private:
+    float alpha;
+    std::atomic<serial_pose2D_t> filtered_pose;
+    float prev_yaw;
+    uint64_t prev_utime; 
+
     // Override the on_update virtual function to implement the complementary filter
     void on_update() {
 
@@ -52,10 +66,4 @@ public:
     serial_pose2D_t get_functional_pose() {
         return filtered_pose.load();
     }
-
-private:
-    float alpha;
-    std::atomic<serial_pose2D_t> filtered_pose;
-    float prev_yaw;
-    uint64_t prev_utime; 
 };

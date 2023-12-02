@@ -18,12 +18,14 @@
 std::atomic<bool> mbot::running(false);
 std::atomic<bool> mbot::server_running(false);
 std::atomic<int> mbot::min_msg_rate(15);
+std::atomic<bool> mbot::fast(false);
 std::atomic<bool> mbot::verbose(false);
 std::atomic<int> mbot::num_mbots;
 std::atomic<uint64_t> mbot::start_time;
 
 std::string mbot::port;
 int mbot::serial_port;
+bool mbot::initialized = false;
 
 std::unordered_map<std::string, mbot *> mbot::mbots;
 std::queue<mbot::packet_t> mbot::send_queue;
@@ -43,13 +45,18 @@ std::condition_variable mbot::send_cv;
 // Contructor
 mbot::mbot(const std::string &name, const std::string &mac)
 {
+    if (!mbot::initialized)
+    {
+        throw(std::runtime_error("mbot not initialized, please call mbot::init before instantiating mbot objects"));
+    }
+
     this->name = name;
     this->alive = true;
     this->mac = mac;
     mac_string_to_bytes(mac, mac_bytes);
 
     // Add the robot to the swarm
-    mbots.insert(std::pair<std::string, mbot *>(mac, this));
+    mbots.insert(std::pair<std::string, mbot *>(this->mac, this));
 
     // Increment the number of robots
     num_mbots++;
@@ -58,7 +65,6 @@ mbot::mbot(const std::string &name, const std::string &mac)
     if (!running.load() && num_mbots.load() == 1)
     {
         running.store(true);
-        verbose.store(false);
 
         // Set start time for timesync offset
         start_time.store(get_time_us());
@@ -116,39 +122,10 @@ mbot::~mbot()
     }
 }
 
-// Initializer from file
-std::vector<mbot> mbot::init_from_file(const std::string &file_name)
+void mbot::init(const std::string &port)
 {
-    // Given a file with a list of MAC addresses, return an array of mbots
-    std::ifstream file(file_name);
-    if (!file.is_open())
-    {
-        perror("Error opening MAC address file. Ensure specified path is correct.\n");
-        return std::vector<mbot>();
-    }
-    std::string line;
-
-    // Read the file and get the number of bots and the mac addresses
-    int num_bots = 0;
-    std::vector<std::string> macs;
-    while (std::getline(file, line))
-    {
-        if (line[0] == '#')
-            continue;
-        macs.push_back(line);
-        num_bots++;
-    }
-
-    // Create the mbots
-    std::vector<mbot> mbots;
-    mbots.reserve(num_bots);
-    for (int i = 0; i < num_bots; i++)
-    {
-        std::string name = "mbot-" + std::to_string(i);
-        mbots.emplace_back(name, macs[i]);
-    }
-
-    return mbots;
+    mbot::port = port;
+    mbot::initialized = true;
 }
 
 // Getters
@@ -192,6 +169,11 @@ serial_mbot_encoders_t mbot::get_encoders()
     return this->encoders.load();
 }
 
+int mbot::get_msg_rate()
+{
+    return this->msg_rate.load();
+}
+
 bool mbot::is_alive()
 {
     return alive.load();
@@ -206,18 +188,8 @@ void mbot::set_robot_vel_goal(float vx, float vy, float wz)
     this->robot_vel_goal.vy = vy;
     this->robot_vel_goal.wz = wz;
 
-    // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&robot_vel_goal, MBOT_VEL_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    this->send_cv.notify_one();
+    // Serialize and send the message
+    encode_and_push_msg(&robot_vel_goal, MBOT_VEL_CMD, this->mac_bytes);
 }
 
 
@@ -230,17 +202,7 @@ void mbot::set_motor_vel_goal(float a, float b, float c = 0.0f)
     this->motor_vel_goal.velocity[2] = c;
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&motor_vel_goal, MBOT_MOTOR_VEL_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    this->send_cv.notify_one();
+    encode_and_push_msg(&motor_vel_goal, MBOT_MOTOR_VEL_CMD, this->mac_bytes);
 }
 
 
@@ -256,16 +218,7 @@ void mbot::set_motor_pwm(float a, float b, float c = 0.0f)
 
     // Serialize message and create packet
     packet_t packet;
-    encode_msg(&mbot_pwm, MBOT_MOTOR_PWM_CMD, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_pwm, MBOT_MOTOR_PWM_CMD, this->mac_bytes);
 }
 
 
@@ -280,21 +233,12 @@ void mbot::set_odom(float x, float y, float theta)
 
     // Serialize message and create packet
     packet_t packet;
-    encode_msg(&mbot_odom, MBOT_ODOMETRY_RESET, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_odom, MBOT_ODOMETRY_RESET, this->mac_bytes);
 }
 
 void mbot::reset_odom()
 {
-    set_encoders(0, 0, 0);
+    set_odom(0, 0, 0);
 }
 
 void mbot::set_encoders(int a, int b, int c = 0)
@@ -307,17 +251,7 @@ void mbot::set_encoders(int a, int b, int c = 0)
     mbot_encoders.ticks[2] = c;
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&mbot_encoders, MBOT_ENCODERS_RESET, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&mbot_encoders, MBOT_ENCODERS_RESET, this->mac_bytes);
 }
 
 void mbot::reset_encoders()
@@ -334,17 +268,7 @@ void mbot::send_timesync()
     timestamp.utime = get_time_us() - start_time.load();
 
     // Serialize message and create packet
-    packet_t packet;
-    encode_msg(&timestamp, MBOT_TIMESYNC, this->mac_bytes, &packet);
-
-    // add to the send queue
-    {
-        std::lock_guard<std::mutex> lock(send_mutex);
-        this->send_queue.push(packet);
-    }
-
-    // alert the send thread there is work to do
-    send_cv.notify_one();
+    encode_and_push_msg(&timestamp, MBOT_TIMESYNC, this->mac_bytes);
 }
 
 // Public static functions
@@ -356,6 +280,11 @@ void mbot::set_verbose(bool state)
 void mbot::set_min_msg_rate(int rate)
 {
     min_msg_rate.store(rate);
+}
+
+void mbot::set_fast(bool state) 
+{
+    fast.store(state);
 }
 
 bool mbot::is_running()
@@ -517,6 +446,7 @@ void mbot::init_serial()
 // Reads all incoming data on USB
 void mbot::recv_th()
 {
+    
     std::ofstream log;
     if (verbose.load())
     {
@@ -532,6 +462,7 @@ void mbot::recv_th()
     uint64_t curr_time = get_time_us();
     while (running.load())
     {
+        bool is_fast = fast.load();
         bool timeout = false;
         size_t timeout_count = 0;
         uint8_t trigger_val = 0x00;
@@ -541,9 +472,11 @@ void mbot::recv_th()
         while (trigger_val != 0xff)
         {
             read(serial_port, &trigger_val, 1);
-            timeout_count++;
+            if (is_fast)
+                continue;
 
             // Only append valid ascii characters
+            timeout_count++;
             if (trigger_val > 0 && trigger_val < 128)
                 buffer.push_back(trigger_val);
 
@@ -554,22 +487,23 @@ void mbot::recv_th()
             }
         }
 
-        // Convert buffer to string, log if verbose
-        std::string buf_str(buffer.begin(), buffer.end());
-        if (verbose.load())
-            log << buf_str << std::flush;
+        if (!is_fast) {
+            // Convert buffer to string, log if verbose
+            std::string buf_str(buffer.begin(), buffer.end());
+            if (verbose.load())
+                log << buf_str << std::flush;
 
-        // Check if host crashed
-        if (buf_str.find("boot:") != std::string::npos)
-        {
-            std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
-            reconnect();
-            continue;
+            // Check if host crashed
+            if (buf_str.find("bootloader") != std::string::npos)
+            {
+                std::cerr << "Error: host crashed. Attempting to reconnect ..." << std::endl;
+                reconnect();
+                continue;
+            }
+            // Check if timeout
+            if (timeout)
+                continue;
         }
-
-        // Check if timeout
-        if (timeout)
-            continue;
 
         // Read MAC address and packet length
         mac_address_t mac;
@@ -588,6 +522,8 @@ void mbot::recv_th()
         if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
             continue;
 
+        
+
         // Update the robot
         std::string mac_str = mac_bytes_to_string(mac);
         if (mbots.find(mac_str) == mbots.end())
@@ -596,12 +532,17 @@ void mbot::recv_th()
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
 
-        // If server is running, puiblish functional pose
+
+
+        // If server is running, publish functional pose
         if (server_running.load())
         {
             serial_pose2D_t odom = curr_mbot->get_functional_pose();
-            server.send_data(jsonify_data(curr_mbot->mac, odom));
+            server.send_data(jsonify_data(curr_mbot->name, odom));
         }
+
+        if (is_fast)
+            continue;
 
         // Update message counts
         if (msg_counts.find(mac_str) == msg_counts.end())
@@ -611,13 +552,12 @@ void mbot::recv_th()
         // Check if robot is alive
         if (curr_time + 1000000 < get_time_us())
         {
-            curr_time = get_time_us();
             int min_rate = mbot::min_msg_rate.load();
             for (auto &msg_count : msg_counts)
             {
                 // Get the robot pointer and message rate
                 mbot *mbot_ptr = mbots[msg_count.first];
-                int message_rate = msg_count.second;
+                int msg_rate = msg_count.second;
 
                 // Get the robot name and set the alive state
                 std::string name = mbot_ptr->name;
@@ -630,13 +570,15 @@ void mbot::recv_th()
                     state = false;
                 }
                 // Check if the message rate is too low
-                else if (message_rate < min_rate)
-                    std::cerr << "Warning: " << name << " sending at " << message_rate << " HZ (min rate: " << min_rate << " Hz)\n";
+                else if (msg_rate < min_rate)
+                    std::cerr << "Warning: " << name << " sending at " << msg_rate << " HZ (min rate: " << min_rate << " Hz)\n";
 
                 // Reset the message count and set the alive state
                 msg_count.second = 0;
                 mbot_ptr->alive.store(state);
+                mbot_ptr->msg_rate.store(msg_rate);
             }
+            curr_time = get_time_us();
         }
     }
     log.close();
@@ -645,6 +587,7 @@ void mbot::recv_th()
 
 void mbot::send_th()
 {
+
     while (running.load())
     {
         packet_t packet;
@@ -741,34 +684,43 @@ int mbot::validate_message(uint8_t *data_serialized, uint16_t message_len, uint8
 }
 
 template <typename T>
-void mbot::encode_msg(T *msg, uint16_t topic, mac_address_t mac, packet_t *pkt)
+void mbot::encode_and_push_msg(T *msg, uint16_t topic, mac_address_t mac)
 {
     size_t msg_len = sizeof(T);
-    *pkt = packet_t(msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3);
+    packet_t pkt(msg_len + ROS_PKG_LEN + MAC_ADDR_LEN + 3);
 
     // add mac address
-    pkt->data[0] = SYNC_FLAG;
-    pkt->data[1] = (uint8_t)((msg_len + ROS_PKG_LEN) % 255);
-    pkt->data[2] = (uint8_t)((msg_len + ROS_PKG_LEN) >> 8);
-    std::memcpy(pkt->data + 3, mac, MAC_ADDR_LEN);
+    pkt.data[0] = SYNC_FLAG;
+    pkt.data[1] = (uint8_t)((msg_len + ROS_PKG_LEN) % 255);
+    pkt.data[2] = (uint8_t)((msg_len + ROS_PKG_LEN) >> 8);
+    std::memcpy(pkt.data + 3, mac, MAC_ADDR_LEN);
 
     // add ROS packet header
-    pkt->data[9] = SYNC_FLAG;
-    pkt->data[10] = VERSION_FLAG;
-    pkt->data[11] = (uint8_t)(msg_len % 255);
-    pkt->data[12] = (uint8_t)(msg_len >> 8);
-    uint8_t cs1_addends[2] = {pkt->data[11], pkt->data[12]};
-    pkt->data[13] = checksum(cs1_addends, 2);
+    pkt.data[9] = SYNC_FLAG;
+    pkt.data[10] = VERSION_FLAG;
+    pkt.data[11] = (uint8_t)(msg_len % 255);
+    pkt.data[12] = (uint8_t)(msg_len >> 8);
+    uint8_t cs1_addends[2] = {pkt.data[11], pkt.data[12]};
+    pkt.data[13] = checksum(cs1_addends, 2);
 
     // add topic and message
-    pkt->data[14] = (uint8_t)(topic % 255);
-    pkt->data[15] = (uint8_t)(topic >> 8);
-    std::memcpy(pkt->data + 16, msg, msg_len);
+    pkt.data[14] = (uint8_t)(topic % 255);
+    pkt.data[15] = (uint8_t)(topic >> 8);
+    std::memcpy(pkt.data + 16, msg, msg_len);
     uint8_t cs2_addends[msg_len + 2];
-    cs2_addends[0] = pkt->data[14];
-    cs2_addends[1] = pkt->data[15];
+    cs2_addends[0] = pkt.data[14];
+    cs2_addends[1] = pkt.data[15];
     std::memcpy(cs2_addends + 2, (uint8_t *)msg, msg_len);
-    pkt->data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
+    pkt.data[16 + msg_len] = checksum(cs2_addends, msg_len + 2);
+
+    // add to the send queue
+    {
+        std::lock_guard<std::mutex> lock(send_mutex);
+        send_queue.push(pkt);
+    }
+
+    // alert the send thread there is work to do
+    send_cv.notify_one();
 }
 
 uint8_t mbot::checksum(uint8_t *addends, int len)
@@ -780,4 +732,23 @@ uint8_t mbot::checksum(uint8_t *addends, int len)
         sum += addends[i];
     }
     return 255 - ((sum) % 256);
+}
+
+std::vector<std::string> get_macs_from_file(const std::string &file_name)
+{
+    std::vector<std::string> macs;
+    std::ifstream file(file_name);
+    if (!file.is_open())
+    {
+        std::cerr << "Error opening file: " << file_name << std::endl;
+        return macs;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        macs.push_back(line);
+    }
+    file.close();
+    return macs;
 }

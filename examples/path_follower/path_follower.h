@@ -1,4 +1,5 @@
 #include "mbot.h"
+#include <algorithm>
 
 volatile sig_atomic_t flag = 1;
 
@@ -12,10 +13,19 @@ public:
         for (std::string line; std::getline(path_file, line);) {
             std::istringstream iss(line);
             serial_pose2D_t goal_pose;
-            if (!(iss >> goal_pose.utime >> goal_pose.x >> goal_pose.y >> goal_pose.theta)) {
+
+            int64_t utime;
+            float x, y, theta;
+            if (!(iss >> utime >> x >> y >> theta)) {
                 std::cerr << "Error reading path file\n";
                 exit(1);
             }
+
+            goal_pose.utime = utime;
+            goal_pose.x = x;
+            goal_pose.y = y;
+            goal_pose.theta = theta;
+            
             path.push(goal_pose);
         }
         std::cout << "Path size: " << path.size() << "\n";
@@ -42,14 +52,25 @@ public:
 
                 error_sum += lookahead_dist;
 
-                float v = Kp * lookahead_dist + Ki * error_sum;
-                float w = curvature * v;
+                float v, w; 
 
-                std::cout << "lookahead_dist: " << lookahead_dist << ", lookahead_theta: " << lookahead_theta << "\n";
-                std::cout << "v: " << v << ", w: " << w << "\n";
+                if (lookahead_dist > 0.3 / 1.5 && fabs(lookahead_theta) > 0.1) {
+                    v = 0.0;
+                    w = lookahead_theta;
+                }
+                else {
+                    v = Kp * lookahead_dist + Ki * error_sum;
+                    w = curvature * v;
+                }
+
+                v = std::clamp(v, 0.0f, 0.3f);
+                w = std::clamp(w, -1.5f, 1.5f);
+
+                // std::cout << "lookahead_dist: " << lookahead_dist << ", lookahead_theta: " << lookahead_theta << "\n";
+                // std::cout << "v: " << v << ", w: " << w << "\n";
 
                 set_robot_vel_goal(v, 0.0, w);
-                usleep(40000);
+                usleep(100000);
                 odom = get_odom();
             }
             path.pop();
@@ -60,7 +81,7 @@ public:
     private:
         float Kp, Ki;
         float eps_lin = 0.02;
-        float eps_ang = 0.1;
+        float eps_ang = 0.2;
 
         std::queue<serial_pose2D_t> path;
 

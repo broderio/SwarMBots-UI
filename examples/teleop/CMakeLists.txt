@@ -1,0 +1,6 @@
+include_directories(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/mbot)
+add_executable(teleop main.cpp)
+find_package(websocketpp CONFIG REQUIRED)
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+target_link_libraries(teleop mbot websocketpp::websocketpp ${CURSES_LIBRARIES})
