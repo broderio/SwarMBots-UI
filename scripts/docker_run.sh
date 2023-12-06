@@ -10,5 +10,6 @@ docker run --hostname=a7be075b748b \
     --label='org.opencontainers.image.ref.name=ubuntu' \
     --label='org.opencontainers.image.version=22.04' \
     --runtime=runc \
+    --name swarmbots \
     -it \
     -d osrf/ros:humble-desktop

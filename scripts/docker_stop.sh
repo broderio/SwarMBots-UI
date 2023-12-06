@@ -9,9 +9,8 @@ CONTAINER_ID=$(docker ps -q -f name=$CONTAINER_NAME)
 # Check if a container was found
 if [ -z "$CONTAINER_ID" ]; then
     echo "No running container named $CONTAINER_NAME found"
-    echo "Starting the container..."
-    docker start $CONTAINER_NAME
+    exit(1)
 fi
 
 # Execute a bash shell in the container
-docker exec -it $CONTAINER_NAME bash
+docker stop $CONTAINER_NAME
