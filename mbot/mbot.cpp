@@ -514,12 +514,12 @@ void mbot::recv_th()
             continue;
 
         // Read message and checksum
-        uint8_t msg_data_serialized[pkt_len];
+        uint8_t msg_data_serialized[204];
         uint8_t data_checksum = 0;
-        read_message(msg_data_serialized, pkt_len, &data_checksum);
+        read_message(msg_data_serialized, 204, &data_checksum);
 
         // Validate message
-        if (!validate_message(msg_data_serialized, pkt_len, data_checksum))
+        if (!validate_message(msg_data_serialized, 204, data_checksum))
             continue;
 
         
