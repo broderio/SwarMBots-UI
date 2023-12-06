@@ -4,7 +4,8 @@ docker run --hostname=a7be075b748b \
     --env=LANG=C.UTF-8 \
     --env=LC_ALL=C.UTF-8 \
     --env=ROS_DISTRO=humble \
-    -p 9002:90 \
+    -p 9002:9002 \
+    -p 8765:8765 \
     -v macs.txt:/etc/macs.txt:ro \
     --restart=no \
     --label='org.opencontainers.image.ref.name=ubuntu' \

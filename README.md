@@ -96,6 +96,7 @@ source /opt/ros/humble/setup.sh
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install libncurses-dev
+sudo apt install ros-$ROS_DISTRO-foxglove-bridge
 colcon build
 source install/setup.sh
 ```
@@ -121,6 +122,14 @@ ros2 run mbot mbot
 **Terminal 1:**
 ```bash
 ros2 run mbot teleop
+```
+
+**Optionally in Terminal 4:**
+```bash
+cd root/SwarMBots-ROS2
+source /opt/ros/humble/setup.sh
+source install/setup.sh
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 
 ## License
