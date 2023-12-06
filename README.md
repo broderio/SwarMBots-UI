@@ -87,8 +87,8 @@ Follow the instructions below to interface with ROS2:
 
 **Terminal 1:**
 ```bash
-. scripts/docker_run.sh
-. scripts/docker_exec.sh
+chmod +x scripts/*.sh
+./scripts/docker_run.sh
 cd root
 git clone https://github.com/broderio/SwarMBots-ROS2.git
 cd SwarMBots-ROS2
@@ -103,7 +103,7 @@ source install/setup.sh
 
 **Terminal 2:**
 ```bash
-. scripts/docker_exec.sh
+./scripts/docker_run.sh
 cd root/SwarMBots-ROS2
 source /opt/ros/humble/setup.sh
 source install/setup.sh
