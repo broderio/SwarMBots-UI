@@ -81,6 +81,48 @@ int main(int argc, char *argv[]) {
 }
 ```
 
+## Interfacing with ROS2
+
+Follow the instructions below to interface with ROS2:
+
+**Terminal 1:**
+```bash
+. scripts/docker_run.sh
+. scripts/docker_exec.sh
+cd root
+git clone https://github.com/broderio/SwarMBots-ROS2.git
+cd SwarMBots-ROS2
+source /opt/ros/humble/setup.sh
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install libncurses-dev
+colcon build
+source install/setup.sh
+```
+
+**Terminal 2:**
+```bash
+. scripts/docker_exec.sh
+cd root/SwarMBots-ROS2
+source /opt/ros/humble/setup.sh
+source install/setup.sh
+```
+
+**Terminal 3:**
+```bash
+python3 python/uartSocket.py [SERIAL PORT]
+```
+
+**Terminal 2:**
+```bash
+ros2 run mbot mbot
+```
+
+**Terminal 1:**
+```bash
+ros2 run mbot teleop
+```
+
 ## License
 
 This project is licensed under the Polyform Noncommercial License - see the [LICENSE.md](LICENSE.md) file for details

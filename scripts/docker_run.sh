@@ -1,0 +1,14 @@
+docker run --hostname=a7be075b748b \
+    --mac-address=02:42:ac:11:00:02 \
+    --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    --env=LANG=C.UTF-8 \
+    --env=LC_ALL=C.UTF-8 \
+    --env=ROS_DISTRO=humble \
+    -p 9002:90 \
+    -v macs.txt:/etc/macs.txt:ro \
+    --restart=no \
+    --label='org.opencontainers.image.ref.name=ubuntu' \
+    --label='org.opencontainers.image.version=22.04' \
+    --runtime=runc \
+    -it \
+    -d osrf/ros:humble-desktop
