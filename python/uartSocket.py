@@ -1,7 +1,6 @@
 import serial
 import socket
 import threading
-import time
 import struct
 import argparse
 
@@ -18,7 +17,6 @@ def get_packet_serial(ser: serial.Serial) -> bytes:
     # Validate length
     length_int = struct.unpack('<H', length)[0]
     if length_int != 204:
-        print(f"Invalid packet length: {length}")
         return None
     
     # Read the rest of the packet
@@ -44,8 +42,6 @@ def get_packet_socket(connection: socket.socket) -> bytes:
         if not data:  # Connection closed
             return None
         trigger = data[0]
-    
-    print("received trigger!")
 
     # Read the length of the packet and its MAC address
     length = recv_exact(connection, 2)
@@ -57,7 +53,6 @@ def get_packet_socket(connection: socket.socket) -> bytes:
 
     # Validate length
     length_int = struct.unpack('<H', length)[0]
-    print(f"received mac and length: {length_int}")
 
     # Read the rest of the packet
     packet = recv_exact(connection, length_int)
@@ -75,7 +70,7 @@ def serial_to_socket(connection, ser):
 
 def socket_to_serial(connection, ser):
     while True:
-        data = connection.recv(204)
+        data = get_packet_socket(connection)
         ser.write(data)
     
 def main():
