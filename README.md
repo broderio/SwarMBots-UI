@@ -5,7 +5,7 @@
 This project requires the `websocketpp` package to start the server for the GUI. Install the prerequisite packages with the install script.
 
 ```bash
-chmod +x scripts/install.sh
+chmod +x scripts/*.sh
 ./scripts/install.sh
 ```
 
@@ -30,7 +30,6 @@ python3 python/pilot.py [SERIAL PORT]
 This project uses `cmake` for building and compiling. To compile the examples, run the following commands.
 
 ```bash
-chmod +x scripts/build.sh
 ./scripts/build.sh
 ```
 
@@ -42,7 +41,6 @@ To save on compile time, you can specify the example you want to compile, rather
 
 After compilation, all of the executables are located in `build/examples/*`. To execute an example, run the following command:
 ```bash
-chmod +x scripts/run.sh
 ./scripts/run.sh [EXAMPLE] [ARG1] [ARG2] ... [ARGN]
 ```
 

@@ -28,6 +28,9 @@ if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
     echo "Docker container $CONTAINER_NAME not found"
     echo "Running the Docker container..."
 
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BASHRC_PATH="$SCRIPT_DIR/.bashrc"
+
     docker run --hostname=a7be075b748b \
         --mac-address=02:42:ac:11:00:02 \
         --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -37,13 +40,14 @@ if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
         -p 9002:9002 \
         -p 8765:8765 \
         -v macs.txt:/etc/macs.txt:ro \
+        -v $BASHRC_PATH:/root/.bashrc:ro \
         --restart=no \
         --label='org.opencontainers.image.ref.name=ubuntu' \
         --label='org.opencontainers.image.version=22.04' \
         --runtime=runc \
         --name $CONTAINER_NAME \
         -it \
-        -d $image
+        -d $IMAGE
 fi
 
 # Check if the container is running
