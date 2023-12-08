@@ -81,52 +81,22 @@ int main(int argc, char *argv[]) {
 
 ## Interfacing with ROS2
 
-Follow the instructions below to interface with ROS2:
+Follow the instructions below to interface with ROS2 and Foxglove:
 
 **Terminal 1:**
-```bash
-chmod +x scripts/*.sh
-./scripts/docker_run.sh
-cd root
-git clone https://github.com/broderio/SwarMBots-ROS2.git
-cd SwarMBots-ROS2
-source /opt/ros/humble/setup.sh
-sudo apt-get update
-sudo apt-get upgrade
-sudo apt-get install libncurses-dev
-sudo apt install ros-$ROS_DISTRO-foxglove-bridge
-colcon build
-source install/setup.sh
-```
-
-**Terminal 2:**
-```bash
-./scripts/docker_run.sh
-cd root/SwarMBots-ROS2
-source /opt/ros/humble/setup.sh
-source install/setup.sh
-```
-
-**Terminal 3:**
 ```bash
 python3 python/uart_bridge.py [SERIAL PORT]
 ```
 
 **Terminal 2:**
 ```bash
+./docker/docker.sh
 ros2 run mbot mbot
 ```
 
-**Terminal 1:**
+**Terminal 3:**
 ```bash
-ros2 run mbot teleop
-```
-
-**Optionally in Terminal 4:**
-```bash
-cd root/SwarMBots-ROS2
-source /opt/ros/humble/setup.sh
-source install/setup.sh
+./docker/docker.sh
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 
