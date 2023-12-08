@@ -109,7 +109,7 @@ source install/setup.sh
 
 **Terminal 3:**
 ```bash
-python3 python/uartSocket.py [SERIAL PORT]
+python3 python/uart_bridge.py [SERIAL PORT]
 ```
 
 **Terminal 2:**

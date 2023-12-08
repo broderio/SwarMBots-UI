@@ -62,20 +62,20 @@ def get_packet_socket(connection: socket.socket) -> bytes:
     # Return reassembled packet
     return bytes([trigger]) + length + mac + packet
 
-def serial_to_socket(connection, ser):
+def serial_to_socket(connection: socket.socket, ser: serial.Serial) -> None:
     while True:
         data = get_packet_serial(ser)
         if data:
             connection.sendall(data)
 
-def socket_to_serial(connection, ser):
+def socket_to_serial(connection: socket.socket, ser: serial.Serial) -> None:
     while True:
         data = get_packet_socket(connection)
         ser.write(data)
     
 def main():
     # Parse input arguments
-    parser = argparse.ArgumentParser(description="UART Socket program.")
+    parser = argparse.ArgumentParser(description="UART ROS Bridge.")
     parser.add_argument("port", help="The serial port to use.")
     args = parser.parse_args()
 
