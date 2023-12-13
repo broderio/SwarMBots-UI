@@ -4,11 +4,11 @@ import threading
 import struct
 import argparse
 
-def get_packet_serial(ser: serial.Serial) -> bytes:
+def get_packet_serial(ser: serial.Serial) -> bytes or None:
     # Wait for the start of a packet
     trigger = 0x00
     while trigger != 0xff:
-        trigger = ser.read()[0]
+        trigger = ser.read(1)[0]
 
     # Read the length of the packet and its MAC address
     length = ser.read(2)
@@ -21,11 +21,12 @@ def get_packet_serial(ser: serial.Serial) -> bytes:
     
     # Read the rest of the packet
     packet = ser.read(204)
+    checksum = ser.read(1)
 
     # Return reassembled packet
-    return bytes([trigger]) + length + mac + packet
+    return bytes([trigger]) + length + mac + packet + checksum
 
-def recv_exact(connection: socket.socket, length: int) -> bytes:
+def recv_exact(connection: socket.socket, length: int) -> bytes or None:
     data = b''
     while len(data) < length:
         chunk = connection.recv(length - len(data))
@@ -34,7 +35,7 @@ def recv_exact(connection: socket.socket, length: int) -> bytes:
         data += chunk
     return data
 
-def get_packet_socket(connection: socket.socket) -> bytes:
+def get_packet_socket(connection: socket.socket) -> bytes or None:
     # Wait for the start of a packet
     trigger = 0x00
     while trigger != 0xff:
@@ -66,13 +67,18 @@ def serial_to_socket(connection: socket.socket, ser: serial.Serial) -> None:
     while True:
         data = get_packet_serial(ser)
         if data:
+            # print("Received packet from serial")
             connection.sendall(data)
 
 def socket_to_serial(connection: socket.socket, ser: serial.Serial) -> None:
+    count = 0
     while True:
         data = get_packet_socket(connection)
-        ser.write(data)
-    
+        if data:
+            print(f"[{count}] Received packet from socket")
+            ser.write(data)
+            count += 1
+
 def main():
     # Parse input arguments
     parser = argparse.ArgumentParser(description="UART ROS Bridge.")
@@ -88,15 +94,15 @@ def main():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     # Bind the socket to the port
-    server_address = ('127.0.0.1', 9002)
+    server_address = ('localhost', 9002)
     sock.bind(server_address)
     
     # Listen for incoming connections
     sock.listen(1)
 
-    print('waiting for a connection')
+    print('Waiting for a connection ...')
     connection, client_address = sock.accept()
-    print('connection from', client_address)
+    print('Connection from', client_address)
 
     threading.Thread(target=serial_to_socket, args=(connection, ser)).start()
     threading.Thread(target=socket_to_serial, args=(connection, ser)).start()

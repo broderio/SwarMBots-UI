@@ -22,6 +22,7 @@ std::atomic<bool> mbot::fast(false);
 std::atomic<bool> mbot::verbose(false);
 std::atomic<int> mbot::num_mbots;
 std::atomic<uint64_t> mbot::start_time;
+std::atomic<int> mbot::num_invalid_msgs;
 
 std::string mbot::port;
 int mbot::serial_port;
@@ -272,6 +273,16 @@ void mbot::send_timesync()
 }
 
 // Public static functions
+int mbot::get_invalid_msg_count()
+{
+    return num_invalid_msgs.load();
+}
+
+void mbot::reset_invalid_msg_count()
+{
+    num_invalid_msgs.store(0);
+}
+
 void mbot::set_verbose(bool state)
 {
     verbose.store(state);
@@ -520,9 +531,10 @@ void mbot::recv_th()
 
         // Validate message
         if (!validate_message(msg_data_serialized, 204, data_checksum))
+        {
+            mbot::num_invalid_msgs++;
             continue;
-
-        
+        }
 
         // Update the robot
         std::string mac_str = mac_bytes_to_string(mac);
@@ -531,8 +543,6 @@ void mbot::recv_th()
         mbot *curr_mbot = mbots[mac_str];
         packets_wrapper_t *pkt_wrapped = (packets_wrapper_t *)msg_data_serialized;
         curr_mbot->update_mbot(pkt_wrapped);
-
-
 
         // If server is running, publish functional pose
         if (server_running.load())

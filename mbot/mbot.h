@@ -59,6 +59,8 @@ public:
     void send_timesync();
 
     // Static functions
+    static int get_invalid_msg_count();
+    static void reset_invalid_msg_count();
     static void set_verbose(bool state);
     static void set_min_msg_rate(int rate);
     static void set_fast(bool state);
@@ -107,6 +109,7 @@ private:
     // Atomic flag to indicate if the robot is alive
     std::atomic<bool> alive;
     std::atomic<int> msg_rate;
+    static std::atomic<int> num_invalid_msgs;
     static bool initialized;
 
     // User defined callback function for update

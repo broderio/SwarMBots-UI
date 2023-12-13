@@ -30,6 +30,7 @@ if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
 
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     BASHRC_PATH="$SCRIPT_DIR/.bashrc"
+    MACS_PATH="$SCRIPT_DIR/../macs.txt"
 
     docker run --hostname=a7be075b748b \
         --mac-address=02:42:ac:11:00:02 \
@@ -39,7 +40,7 @@ if [ -z "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
         --env=ROS_DISTRO=humble \
         -p 9002:9002 \
         -p 8765:8765 \
-        -v macs.txt:/etc/macs.txt:ro \
+        -v $MACS_PATH:/etc/macs.txt:ro \
         -v $BASHRC_PATH:/root/.bashrc:ro \
         --restart=no \
         --label='org.opencontainers.image.ref.name=ubuntu' \
